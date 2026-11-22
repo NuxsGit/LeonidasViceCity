@@ -1,0 +1,11 @@
+{
+  "id": "neon_vice_postfx",
+  "name": "80s Neon Wave Shaders & PostFX",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Visuals",
+  "description": "Next-gen post-processing shaders bringing the modern Vice City Remake aesthetic: vibrant neon glow, ACES filmic tonemapping, sunset color grading, subtle bloom, and sharpening.",
+  "enabled": true,
+  "priority": 90,
+  "tags": ["shaders", "bloom", "postfx", "remake"]
+}

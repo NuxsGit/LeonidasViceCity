@@ -1,0 +1,10 @@
+{
+  "hd_remake_active": true,
+  "mods": {
+    "hd_remake_essentials": true,
+    "neon_vice_postfx": true,
+    "hd_hud_and_ui": true,
+    "modern_pc_controls": true,
+    "extreme_city_life": true
+  }
+}

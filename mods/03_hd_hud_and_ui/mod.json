@@ -1,0 +1,11 @@
+{
+  "id": "hd_hud_and_ui",
+  "name": "HD Widescreen HUD & Radar",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "UI",
+  "description": "Edge-anchored 16:9 widescreen HUD, crisp high-res radar map, polished weapon icons, modern crosshairs, and remastered font scaling.",
+  "enabled": true,
+  "priority": 80,
+  "tags": ["hud", "widescreen", "ui", "radar"]
+}

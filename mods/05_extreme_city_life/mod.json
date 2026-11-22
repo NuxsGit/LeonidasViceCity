@@ -1,0 +1,11 @@
+{
+  "id": "extreme_city_life",
+  "name": "Extreme City Life (Traffic & Pedestrians)",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Gameplay",
+  "description": "Massive boost to car and pedestrian population (250-300%) with smart anti-pop-in persistence so cars never vanish while looking away, making Vice City feel truly alive.",
+  "enabled": true,
+  "priority": 60,
+  "tags": ["traffic", "pedestrians", "immersion", "city"]
+}
