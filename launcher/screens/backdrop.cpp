@@ -226,6 +226,7 @@ namespace screens
         {
             uint32_t generation = 0;
             float uv[mascot_data::kLayerCount][4] = {};
+            float uvSilhouette[4] = {};
             bool loaded = false;
         };
         MascotState g_mascot;
@@ -240,15 +241,26 @@ namespace screens
             mascot_data::decodeRle(mascot_data::kRleData, mascot_data::kRleSize, uncompressed.data(), uncompressed.size());
 
             const size_t layerBytes = size_t(mascot_data::kWidth) * size_t(mascot_data::kHeight);
+            std::vector<uint8_t> silhouette(layerBytes, 0);
+
             bool allOk = true;
             for (int i = 0; i < mascot_data::kLayerCount; ++i)
             {
                 const uint8_t *layerPtr = uncompressed.data() + size_t(i) * layerBytes;
+                for (size_t p = 0; p < layerBytes; ++p)
+                {
+                    if (layerPtr[p] > silhouette[p])
+                        silhouette[p] = layerPtr[p];
+                }
                 if (!atlasUploadMask(mascot_data::kWidth, mascot_data::kHeight, layerPtr, g_mascot.uv[i]))
                 {
                     allOk = false;
                     break;
                 }
+            }
+            if (allOk && !atlasUploadMask(mascot_data::kWidth, mascot_data::kHeight, silhouette.data(), g_mascot.uvSilhouette))
+            {
+                allOk = false;
             }
             if (allOk)
             {
@@ -259,94 +271,186 @@ namespace screens
 
         void maccateams(const Scene &S, float cx, float cy, float radius, float hero)
         {
-            const float mw = std::clamp(S.s * 0.58f, px(320.0f), px(560.0f));
-            const float mh = mw * (float(mascot_data::kHeight) / float(mascot_data::kWidth));
-            const float e = core::easeOutCubic(hero);
-            const float entranceY = (1.0f - e) * px(60.0f);
-            const float my = S.horizon - mh + px(10.0f) + entranceY;
-            const Rect box{cx - mw * 0.5f, my, mw, mh};
+            const float mwBase = std::clamp(S.s * 0.58f, px(320.0f), px(560.0f));
 
-            // Mouse tracking vector
+            // --- GTA-STYLE ENTRANCE & SLIDE ANIMATION ---
+            // Cinematic quartic ease-out deceleration curve for the slide-in
+            const float tHero = std::clamp(hero, 0.0f, 1.0f);
+            const float invT = 1.0f - tHero;
+            const float slideE = 1.0f - invT * invT * invT * invT;
+
+            // Smooth GTA slide-in from the right
+            const float entranceSlideX = (1.0f - slideE) * px(240.0f);
+            const float entranceSlideY = (1.0f - slideE) * px(30.0f);
+            // GTA camera focal zoom settle
+            const float entranceScale = 1.0f + (1.0f - slideE) * 0.06f;
+
+            const float mw = mwBase * entranceScale;
+            const float mh = mw * (float(mascot_data::kHeight) / float(mascot_data::kWidth));
+
+            // Subtle alive breathing float when settled
+            const float idleFloatY = (hero > 0.90f && ui::state.motion > 0)
+                ? (std::sin(S.t * 1.5f) * px(2.5f))
+                : 0.0f;
+
+            const float my = S.horizon - mh + px(10.0f) + entranceSlideY + idleFloatY;
+            const float baseX = cx - mw * 0.5f + entranceSlideX;
+            const Rect box{baseX, my, mw, mh};
+
+            // Mouse tracking vector (-1.2 to +1.2) for 3D tilt
             float relX = 0.0f, relY = 0.0f;
             if (platform::input.mouseInside)
             {
-                relX = std::clamp((platform::input.mouseX - box.cx()) / (mw * 0.5f), -1.5f, 1.5f);
-                relY = std::clamp((platform::input.mouseY - box.cy()) / (mh * 0.5f), -1.5f, 1.5f);
+                relX = std::clamp((platform::input.mouseX - box.cx()) / (mw * 0.5f), -1.2f, 1.2f);
+                relY = std::clamp((platform::input.mouseY - box.cy()) / (mh * 0.5f), -1.2f, 1.2f);
             }
-            else
+            else if (ui::state.motion > 0)
             {
-                relX = 0.35f * std::sin(S.t * 1.2f);
-                relY = 0.20f * std::cos(S.t * 0.9f);
+                relX = 0.28f * std::sin(S.t * 1.1f);
+                relY = 0.16f * std::cos(S.t * 0.8f);
             }
 
-            // --- LEONIDAS SYNTHWAVE GLOWING AURA (Shifted by mouse cursor parallax) ---
-            const float glowShiftX = relX * px(14.0f);
-            const float glowShiftY = relY * px(10.0f);
-            shadow({box.x + glowShiftX - mw * 0.06f, box.y + glowShiftY - mh * 0.08f, mw * 1.12f, mh * 1.16f},
-                   withAlpha(rgb(0xED1E79), 0.36f * hero), mw * 0.26f, mw * 0.15f);
-            shadow({box.x + glowShiftX * 0.6f + mw * 0.05f, box.y + glowShiftY * 0.6f + mh * 0.05f, mw * 0.90f, mh * 0.90f},
-                   withAlpha(rgb(0x662D91), 0.45f * hero), mw * 0.18f, mw * 0.20f);
-            shadow({box.x + mw * 0.10f, box.y + mh * 0.20f, mw * 0.80f, mh * 0.60f},
-                   withAlpha(rgb(0xF7931E), 0.22f * hero), mw * 0.16f, mw * 0.12f);
+            const float tiltX = relX;
+            const float tiltY = relY;
+
+            // --- 3D CARD MULTI-PLANE DEPTH OFFSETS ---
+            // Layer -1 (Far back aura): opposite shift for deep 3D sensation
+            const float glowDx = -tiltX * px(12.0f);
+            const float glowDy = -tiltY * px(8.0f);
+            // Layer 0 (Card backplate): subtle shift
+            const float cardDx = tiltX * px(4.0f);
+            const float cardDy = tiltY * px(3.0f);
+            // Layer +1 (Character body): medium shift
+            const float bodyDx = tiltX * px(9.0f);
+            const float bodyDy = tiltY * px(6.0f);
+            // Layer +2 (Foreground specular accessories / glints): max shift
+            const float fgDx = tiltX * px(15.0f);
+            const float fgDy = tiltY * px(10.0f);
+
+            const Rect cardBox{
+                box.x - px(14.0f) + cardDx,
+                box.y - px(10.0f) + cardDy,
+                box.w + px(28.0f),
+                box.h + px(18.0f)
+            };
+
+            // 1. 3D Elevation Drop Shadow
+            shadow({cardBox.x + tiltX * px(12.0f), cardBox.y + px(12.0f) + tiltY * px(8.0f), cardBox.w, cardBox.h},
+                   withAlpha(rgb(0x000000), 0.50f * hero), px(24.0f), px(10.0f));
+
+            // 2. Leonidas Synthwave Glowing Aura (Background depth)
+            shadow({cardBox.x + glowDx - mw * 0.05f, cardBox.y + glowDy - mh * 0.06f, mw * 1.10f, mh * 1.12f},
+                   withAlpha(rgb(0xED1E79), 0.38f * hero), mw * 0.25f, mw * 0.14f);
+            shadow({cardBox.x + glowDx * 0.6f + mw * 0.04f, cardBox.y + glowDy * 0.6f + mh * 0.04f, mw * 0.92f, mh * 0.92f},
+                   withAlpha(rgb(0x662D91), 0.44f * hero), mw * 0.16f, mw * 0.18f);
+
+            // 3. Card Translucent Dark Synthwave Glass Plate with Rounded Corners
+            rect(cardBox, withAlpha(rgb(0x130826), 0.50f * hero), px(14.0f));
+
+            // 4. Subtle Glass Card Inner Highlight
+            rect({cardBox.x + px(1.0f), cardBox.y + px(1.0f), cardBox.w - px(2.0f), cardBox.h - px(2.0f)},
+                 withAlpha(rgb(0xFFFFFF), 0.035f * hero), px(13.0f));
+
+            // 5. Card 3D Rim / Neon Border (Reacts dynamically to 3D tilt light angle)
+            const float rimPink = std::clamp(0.20f + tiltX * 0.25f, 0.08f, 0.60f);
+            const float rimCyan = std::clamp(0.20f - tiltX * 0.25f, 0.08f, 0.60f);
+            shadow(cardBox, withAlpha(rgb(0xED1E79), rimPink * hero), px(7.0f), px(1.5f));
+            shadow(cardBox, withAlpha(rgb(0x29ABE2), rimCyan * hero), px(5.0f), px(1.0f));
+
+            // 6. Holographic Card Edge Specular Highlight along top edge
+            const bool hovered = cardBox.contains(platform::input.mouseX, platform::input.mouseY);
+            const float edgeGlintX = cardBox.x + cardBox.w * std::clamp(0.5f + tiltX * 0.42f, 0.10f, 0.90f);
+            line(edgeGlintX - px(24.0f), cardBox.y, edgeGlintX + px(24.0f), cardBox.y,
+                 px(1.8f), withAlpha(rgb(0xFFFFFF), (0.40f + 0.35f * (hovered ? 1.0f : 0.0f)) * hero));
 
             // Ensure atlas has layers
             loadMascotLayers();
             if (!g_mascot.loaded)
                 return;
 
+            const Rect bodyBox{box.x + bodyDx, box.y + bodyDy, box.w, box.h};
+
             // Render all 10 vector layers of Maccateams.svg
             for (int i = 0; i < mascot_data::kLayerCount; ++i)
             {
-                glyph(box, g_mascot.uv[i], rgb(mascot_data::kLayers[i].colorRgb));
+                glyph(bodyBox, g_mascot.uv[i], rgb(mascot_data::kLayers[i].colorRgb));
             }
 
-            // --- INTERACTIVE SPECULAR LIGHT REFLECTION ANIMATION ---
-            // 1. Diagonal light sweep across the characters
-            pushClip(box);
-            const bool hovered = box.contains(platform::input.mouseX, platform::input.mouseY);
-            const float sweep = 0.5f + relX * 0.42f + relY * 0.20f;
-            const float beamX = box.x + box.w * std::clamp(sweep, 0.05f, 0.95f);
-            const float beamW = px(30.0f) + (hovered ? px(16.0f) : 0.0f);
-            line(beamX - px(25.0f), box.bottom() + px(10.0f), beamX + px(45.0f), box.y - px(10.0f),
-                 beamW, withAlpha(rgb(0xFFFFFF), hovered ? 0.32f : 0.18f));
-            line(beamX - px(10.0f), box.bottom() + px(10.0f), beamX + px(60.0f), box.y - px(10.0f),
-                 beamW * 0.45f, withAlpha(rgb(0xFFD7E9), hovered ? 0.50f : 0.28f));
+            // --- SPECULAR LIGHT REFLECTION STRICTLY ON CHARACTERS (NEVER ON BACKGROUND) ---
+            // Rendered using the character silhouette alpha mask so light NEVER touches the sky or skyline!
+            const float sweep = platform::input.mouseInside
+                ? (0.5f + tiltX * 0.42f + tiltY * 0.16f)
+                : (0.5f + 0.32f * std::sin(S.t * 1.3f));
+            const float beamCenter = bodyBox.x + bodyBox.w * std::clamp(sweep, 0.08f, 0.92f);
+            const float slant = px(36.0f);
+            const float coreW = px(26.0f) + (hovered ? px(14.0f) : 0.0f);
+            const float softW = coreW * 2.2f;
 
-            // 2. Interactive sunglasses specular glints
+            // Divide height into vertical slices to form an angled diagonal light beam
+            constexpr int kSlices = 10;
+            for (int k = 0; k < kSlices; ++k)
+            {
+                const float y0 = bodyBox.y + (bodyBox.h * float(k)) / float(kSlices);
+                const float y1 = bodyBox.y + (bodyBox.h * float(k + 1)) / float(kSlices);
+                const float sliceH = y1 - y0;
+                const float tSlice = (float(k) + 0.5f) / float(kSlices) - 0.5f;
+                const float sliceCenterX = beamCenter - tSlice * slant;
+
+                // 1. Soft secondary synthwave gloss sheen (strictly masked to character silhouette)
+                pushClip(Rect{sliceCenterX - softW * 0.5f, y0, softW, sliceH});
+                glyph(bodyBox, g_mascot.uvSilhouette, withAlpha(rgb(0xFFD7E9), (hovered ? 0.22f : 0.14f) * hero));
+                popClip();
+
+                // 2. Core crisp specular reflection band (strictly masked to character silhouette)
+                pushClip(Rect{sliceCenterX - coreW * 0.5f, y0, coreW, sliceH});
+                glyph(bodyBox, g_mascot.uvSilhouette, withAlpha(rgb(0xFFFFFF), (hovered ? 0.38f : 0.24f) * hero));
+                popClip();
+            }
+
+            // GTA entrance flash across character on arrival
+            if (hero > 0.65f && hero < 0.98f)
+            {
+                const float gtaFlashT = (hero - 0.65f) / 0.33f;
+                const float flashAlpha = std::sin(gtaFlashT * 3.14159f) * 0.35f;
+                const float flashX = bodyBox.x + bodyBox.w * gtaFlashT;
+                pushClip(Rect{flashX - px(40.0f), bodyBox.y, px(80.0f), bodyBox.h});
+                glyph(bodyBox, g_mascot.uvSilhouette, withAlpha(rgb(0xFFFFFF), flashAlpha));
+                popClip();
+            }
+
+            // --- FOREGROUND SPECULAR DETAILS (Sunglass lenses, gold medallion) ---
             const float scaleX = mw / float(mascot_data::kWidth);
             const float scaleY = mh / float(mascot_data::kHeight);
-            const float glintDx = std::clamp(relX * px(4.0f), -px(3.5f), px(3.5f));
-            const float glintDy = std::clamp(relY * px(2.5f), -px(2.5f), px(2.5f));
+            const float glintDx = fgDx + std::clamp(tiltX * px(3.0f), -px(3.5f), px(3.5f));
+            const float glintDy = fgDy + std::clamp(tiltY * px(2.0f), -px(2.5f), px(2.5f));
 
             // Macca left lens
-            const float lx = box.x + 297.8f * scaleX, ly = box.y + 52.5f * scaleY;
+            const float lx = bodyBox.x + 297.8f * scaleX, ly = bodyBox.y + 52.5f * scaleY;
             line(lx - px(4.5f) * scaleX + glintDx, ly + px(3.0f) * scaleY + glintDy,
                  lx + px(4.5f) * scaleX + glintDx, ly - px(3.0f) * scaleY + glintDy,
-                 px(2.2f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.85f));
+                 px(2.2f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.85f * hero));
 
             // Macca right lens
-            const float rx = box.x + 309.6f * scaleX, ry = box.y + 61.8f * scaleY;
+            const float rx = bodyBox.x + 309.6f * scaleX, ry = bodyBox.y + 61.8f * scaleY;
             line(rx - px(7.0f) * scaleX + glintDx, ry + px(4.5f) * scaleY + glintDy,
                  rx + px(7.0f) * scaleX + glintDx, ry - px(4.5f) * scaleY + glintDy,
-                 px(2.6f) * scaleY, withAlpha(rgb(0x29ABE2), 0.90f));
+                 px(2.6f) * scaleY, withAlpha(rgb(0x29ABE2), 0.90f * hero));
             line(rx - px(3.0f) * scaleX + glintDx, ry + px(2.0f) * scaleY + glintDy,
                  rx + px(3.0f) * scaleX + glintDx, ry - px(2.0f) * scaleY + glintDy,
-                 px(1.4f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.95f));
+                 px(1.4f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.95f * hero));
 
             // Purple manatee sunglasses glint
-            const float mx = box.x + 137.0f * scaleX, myGlint = box.y + 90.0f * scaleY;
+            const float mx = bodyBox.x + 137.0f * scaleX, myGlint = bodyBox.y + 90.0f * scaleY;
             line(mx - px(4.0f) * scaleX + glintDx * 0.7f, myGlint + px(2.0f) * scaleY + glintDy * 0.7f,
                  mx + px(4.0f) * scaleX + glintDx * 0.7f, myGlint - px(2.0f) * scaleY + glintDy * 0.7f,
-                 px(1.6f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.75f));
+                 px(1.6f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.75f * hero));
 
             // Gold medallion specular highlight
-            const float gx = box.x + 150.0f * scaleX, gy = box.y + 185.0f * scaleY;
+            const float gx = bodyBox.x + 150.0f * scaleX, gy = bodyBox.y + 185.0f * scaleY;
             const float gIntensity = 0.5f + 0.5f * std::max(0.0f, 1.0f - std::hypot(relX + 0.35f, relY - 0.4f));
-            circle(gx + glintDx, gy + glintDy, px(3.8f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.65f * gIntensity));
-            shadow({gx - px(7.0f), gy - px(7.0f), px(14.0f), px(14.0f)},
-                   withAlpha(rgb(0xFCEE21), 0.50f * gIntensity), px(4.5f), px(7.0f));
-
-            popClip();
+            circle(gx + glintDx, gy + glintDy, px(3.8f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.65f * gIntensity * hero));
+            shadow({gx + glintDx - px(7.0f), gy + glintDy - px(7.0f), px(14.0f), px(14.0f)},
+                   withAlpha(rgb(0xFCEE21), 0.50f * gIntensity * hero), px(4.5f), px(7.0f));
         }
 
         // streaks across the sun, coming and going: one appears every 10 s or so at a random place around the sun,
