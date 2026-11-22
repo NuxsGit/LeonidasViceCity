@@ -67,6 +67,10 @@ namespace render
     // one glyph, its ink centred on (cx, cy): icons
     void drawIcon(Font font, float px, float cx, float cy, core::Color color, char32_t codepoint);
 
+    // upload a custom coverage mask (single-channel 8-bit) directly into the glyph atlas
+    bool atlasUploadMask(int w, int h, const uint8_t *coverage, float uv[4]);
+    uint32_t atlasGeneration();
+
     // `text` cut to `width` with an ellipsis (whole characters)
     std::string ellipsize(Font font, float px, std::string_view text, float width);
     // `text` broken into lines no wider than `width` at spaces (explicit newlines kept)
