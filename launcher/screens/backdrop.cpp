@@ -7,7 +7,9 @@
 // from the player's own disc in this slot - docs/LAUNCHER.md.)
 #include "shell.h"
 
+#include "maccateams_art.h"
 #include "platform/platform.h"
+#include "render/font.h"
 
 #include <cmath>
 #include <cstdint>
@@ -220,95 +222,129 @@ namespace screens
             }
         }
 
-        void sun(const Scene &S, float cx, float cy, float radius)
+        struct MascotState
         {
-            // Leonidas synthwave glowing sun aura
-            shadow({cx - radius * 1.35f, cy - radius * 1.25f, radius * 2.7f, radius * 2.5f}, withAlpha(rgb(0xED1E79), 0.25f), radius * 0.65f, radius);
-            shadow({cx - radius * 1.1f, cy - radius * 1.1f, radius * 2.2f, radius * 2.2f}, withAlpha(rgb(0x662D91), 0.30f), radius * 0.25f, radius);
+            uint32_t generation = 0;
+            float uv[mascot_data::kLayerCount][4] = {};
+            bool loaded = false;
+        };
+        MascotState g_mascot;
 
-            // Disc with Leonidas gradient: Purple -> Neon Pink -> Sunset Gold
-            const Rect disc{cx - radius, cy - radius, radius * 2, radius * 2};
-            const Color top = rgb(0x662D91), mid = rgb(0xED1E79), bottom = rgb(0xF7931E);
-            const float from = std::round(cy - radius * 0.05f), span = S.horizon - from;
-            pushClip({0, 0, S.w, S.horizon});
-            pushClip({0, disc.y, S.w, from - disc.y});
-            gradient(disc, top, mid, radius);
-            popClip();
+        void loadMascotLayers()
+        {
+            const uint32_t currentGen = atlasGeneration();
+            if (g_mascot.loaded && g_mascot.generation == currentGen)
+                return;
 
-            // Sliding retro synthwave bands below the mid line
-            constexpr int kBands = 6;
-            const float slide = S.t * 0.10f - std::floor(S.t * 0.10f);
-            auto yAt = [&](float u) { return from + span * u * (1.35f - 0.35f * u); };
-            for (int k = -1; k < kBands; ++k)
+            std::vector<uint8_t> uncompressed(mascot_data::kUncompressedSize);
+            mascot_data::decodeRle(mascot_data::kRleData, mascot_data::kRleSize, uncompressed.data(), uncompressed.size());
+
+            const size_t layerBytes = size_t(mascot_data::kWidth) * size_t(mascot_data::kHeight);
+            bool allOk = true;
+            for (int i = 0; i < mascot_data::kLayerCount; ++i)
             {
-                const float u0 = (float(k) + slide) / kBands, u1 = (float(k) + 1 + slide) / kBands;
-                const float gap = 0.10f + 0.55f * core::clamp01((u0 + u1) * 0.5f);
-                const float y0 = yAt(std::max(u0, 0.0f)), y1 = yAt(std::min(u0 + (u1 - u0) * (1 - gap), 1.0f));
-                if (y1 <= y0)
-                    continue;
-                pushClip({0, y0, S.w, y1 - y0});
-                gradient(disc, mid, bottom, radius);
-                popClip();
+                const uint8_t *layerPtr = uncompressed.data() + size_t(i) * layerBytes;
+                if (!atlasUploadMask(mascot_data::kWidth, mascot_data::kHeight, layerPtr, g_mascot.uv[i]))
+                {
+                    allOk = false;
+                    break;
+                }
+            }
+            if (allOk)
+            {
+                g_mascot.generation = atlasGeneration();
+                g_mascot.loaded = true;
+            }
+        }
+
+        void maccateams(const Scene &S, float cx, float cy, float radius, float hero)
+        {
+            const float mw = std::clamp(S.s * 0.58f, px(320.0f), px(560.0f));
+            const float mh = mw * (float(mascot_data::kHeight) / float(mascot_data::kWidth));
+            const float e = core::easeOutCubic(hero);
+            const float entranceY = (1.0f - e) * px(60.0f);
+            const float my = S.horizon - mh + px(10.0f) + entranceY;
+            const Rect box{cx - mw * 0.5f, my, mw, mh};
+
+            // Mouse tracking vector
+            float relX = 0.0f, relY = 0.0f;
+            if (platform::input.mouseInside)
+            {
+                relX = std::clamp((platform::input.mouseX - box.cx()) / (mw * 0.5f), -1.5f, 1.5f);
+                relY = std::clamp((platform::input.mouseY - box.cy()) / (mh * 0.5f), -1.5f, 1.5f);
+            }
+            else
+            {
+                relX = 0.35f * std::sin(S.t * 1.2f);
+                relY = 0.20f * std::cos(S.t * 0.9f);
             }
 
-            // --- LEONIDAS MASCOT (Macca the Alligator) ---
-            // Scaled dynamically with the rising sun and animated along with it
-            const float scale = radius / px(150.0f);
-            const float ox = cx - radius * 0.12f;
-            const float oy = cy - radius * 0.10f;
+            // --- LEONIDAS SYNTHWAVE GLOWING AURA (Shifted by mouse cursor parallax) ---
+            const float glowShiftX = relX * px(14.0f);
+            const float glowShiftY = relY * px(10.0f);
+            shadow({box.x + glowShiftX - mw * 0.06f, box.y + glowShiftY - mh * 0.08f, mw * 1.12f, mh * 1.16f},
+                   withAlpha(rgb(0xED1E79), 0.36f * hero), mw * 0.26f, mw * 0.15f);
+            shadow({box.x + glowShiftX * 0.6f + mw * 0.05f, box.y + glowShiftY * 0.6f + mh * 0.05f, mw * 0.90f, mh * 0.90f},
+                   withAlpha(rgb(0x662D91), 0.45f * hero), mw * 0.18f, mw * 0.20f);
+            shadow({box.x + mw * 0.10f, box.y + mh * 0.20f, mw * 0.80f, mh * 0.60f},
+                   withAlpha(rgb(0xF7931E), 0.22f * hero), mw * 0.16f, mw * 0.12f);
 
-            // Mascots base alligator head profile
-            const Rect headBase{ox - px(65) * scale, oy - px(55) * scale, px(160) * scale, px(100) * scale};
-            rect(headBase, withAlpha(rgb(0xED1E79), 0.90f), {px(40) * scale, px(20) * scale, px(12) * scale, px(45) * scale});
+            // Ensure atlas has layers
+            loadMascotLayers();
+            if (!g_mascot.loaded)
+                return;
 
-            // Long snout pointing right
-            const Rect snout{ox + px(10) * scale, oy - px(16) * scale, px(105) * scale, px(52) * scale};
-            rect(snout, withAlpha(rgb(0xED1E79), 0.95f), {px(12) * scale, px(22) * scale, px(28) * scale, px(8) * scale});
-
-            // Alligator jaw contour
-            const Rect jaw{ox - px(25) * scale, oy + px(26) * scale, px(120) * scale, px(28) * scale};
-            rect(jaw, withAlpha(rgb(0x4B1248), 0.85f), {px(6) * scale, px(16) * scale, px(20) * scale, px(8) * scale});
-
-            // Grinning alligator sharp teeth
-            for (int t = 0; t < 5; ++t)
+            // Render all 10 vector layers of Maccateams.svg
+            for (int i = 0; i < mascot_data::kLayerCount; ++i)
             {
-                const float tx = ox + (px(20) + float(t) * px(15)) * scale;
-                const float ty = oy + px(22) * scale;
-                rect({tx, ty, px(6.5f) * scale, px(10.0f) * scale}, rgb(0xFFFFFF), px(1.5f) * scale);
+                glyph(box, g_mascot.uv[i], rgb(mascot_data::kLayers[i].colorRgb));
             }
 
-            // Cool 80s sunglasses
-            // Left lens
-            const Rect lensL{ox - px(20) * scale, oy - px(44) * scale, px(48) * scale, px(26) * scale};
-            rect(lensL, rgb(0x1F0B2E), px(4) * scale);
-            rect(lensL.inset(px(2) * scale), rgb(0x662D91), px(3) * scale);
-            line(lensL.x + px(5) * scale, lensL.bottom() - px(4) * scale,
-                 lensL.right() - px(6) * scale, lensL.y + px(5) * scale, px(2.5f) * scale, rgb(0xFFFFFF));
+            // --- INTERACTIVE SPECULAR LIGHT REFLECTION ANIMATION ---
+            // 1. Diagonal light sweep across the characters
+            pushClip(box);
+            const bool hovered = box.contains(platform::input.mouseX, platform::input.mouseY);
+            const float sweep = 0.5f + relX * 0.42f + relY * 0.20f;
+            const float beamX = box.x + box.w * std::clamp(sweep, 0.05f, 0.95f);
+            const float beamW = px(30.0f) + (hovered ? px(16.0f) : 0.0f);
+            line(beamX - px(25.0f), box.bottom() + px(10.0f), beamX + px(45.0f), box.y - px(10.0f),
+                 beamW, withAlpha(rgb(0xFFFFFF), hovered ? 0.32f : 0.18f));
+            line(beamX - px(10.0f), box.bottom() + px(10.0f), beamX + px(60.0f), box.y - px(10.0f),
+                 beamW * 0.45f, withAlpha(rgb(0xFFD7E9), hovered ? 0.50f : 0.28f));
 
-            // Right lens (angled towards snout)
-            const Rect lensR{ox + px(34) * scale, oy - px(38) * scale, px(50) * scale, px(24) * scale};
-            rect(lensR, rgb(0x1F0B2E), px(4) * scale);
-            rect(lensR.inset(px(2) * scale), rgb(0x662D91), px(3) * scale);
-            line(lensR.x + px(5) * scale, lensR.bottom() - px(4) * scale,
-                 lensR.right() - px(6) * scale, lensR.y + px(5) * scale, px(2.5f) * scale, rgb(0x29ABE2));
+            // 2. Interactive sunglasses specular glints
+            const float scaleX = mw / float(mascot_data::kWidth);
+            const float scaleY = mh / float(mascot_data::kHeight);
+            const float glintDx = std::clamp(relX * px(4.0f), -px(3.5f), px(3.5f));
+            const float glintDy = std::clamp(relY * px(2.5f), -px(2.5f), px(2.5f));
 
-            // Sunglasses bridge
-            line(lensL.right(), oy - px(32) * scale, lensR.x, oy - px(30) * scale, px(3.5f) * scale, rgb(0x1F0B2E));
+            // Macca left lens
+            const float lx = box.x + 297.8f * scaleX, ly = box.y + 52.5f * scaleY;
+            line(lx - px(4.5f) * scaleX + glintDx, ly + px(3.0f) * scaleY + glintDy,
+                 lx + px(4.5f) * scaleX + glintDx, ly - px(3.0f) * scaleY + glintDy,
+                 px(2.2f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.85f));
 
-            // Tropical cocktail glass with orange umbrella
-            const float gx = cx + radius * 0.44f;
-            const float gy = cy + radius * 0.32f;
-            const float gCorners[8] = {
-                gx - px(14) * scale, gy - px(12) * scale,
-                gx + px(14) * scale, gy - px(12) * scale,
-                gx + px(3) * scale, gy + px(10) * scale,
-                gx - px(3) * scale, gy + px(10) * scale,
-            };
-            quad(gCorners, withAlpha(rgb(0xFFE4F0), 0.80f));
-            line(gx, gy + px(10) * scale, gx, gy + px(24) * scale, px(2.2f) * scale, rgb(0xFFFFFF));
-            line(gx - px(9) * scale, gy + px(24) * scale, gx + px(9) * scale, gy + px(24) * scale, px(2.2f) * scale, rgb(0xFFFFFF));
-            line(gx + px(2) * scale, gy - px(2) * scale, gx + px(16) * scale, gy - px(20) * scale, px(2) * scale, rgb(0xF7931E));
-            arc(gx + px(16) * scale, gy - px(20) * scale, px(10) * scale, px(5) * scale, 3.14f, 2.4f, rgb(0xF7931E));
+            // Macca right lens
+            const float rx = box.x + 309.6f * scaleX, ry = box.y + 61.8f * scaleY;
+            line(rx - px(7.0f) * scaleX + glintDx, ry + px(4.5f) * scaleY + glintDy,
+                 rx + px(7.0f) * scaleX + glintDx, ry - px(4.5f) * scaleY + glintDy,
+                 px(2.6f) * scaleY, withAlpha(rgb(0x29ABE2), 0.90f));
+            line(rx - px(3.0f) * scaleX + glintDx, ry + px(2.0f) * scaleY + glintDy,
+                 rx + px(3.0f) * scaleX + glintDx, ry - px(2.0f) * scaleY + glintDy,
+                 px(1.4f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.95f));
+
+            // Purple manatee sunglasses glint
+            const float mx = box.x + 137.0f * scaleX, myGlint = box.y + 90.0f * scaleY;
+            line(mx - px(4.0f) * scaleX + glintDx * 0.7f, myGlint + px(2.0f) * scaleY + glintDy * 0.7f,
+                 mx + px(4.0f) * scaleX + glintDx * 0.7f, myGlint - px(2.0f) * scaleY + glintDy * 0.7f,
+                 px(1.6f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.75f));
+
+            // Gold medallion specular highlight
+            const float gx = box.x + 150.0f * scaleX, gy = box.y + 185.0f * scaleY;
+            const float gIntensity = 0.5f + 0.5f * std::max(0.0f, 1.0f - std::hypot(relX + 0.35f, relY - 0.4f));
+            circle(gx + glintDx, gy + glintDy, px(3.8f) * scaleY, withAlpha(rgb(0xFFFFFF), 0.65f * gIntensity));
+            shadow({gx - px(7.0f), gy - px(7.0f), px(14.0f), px(14.0f)},
+                   withAlpha(rgb(0xFCEE21), 0.50f * gIntensity), px(4.5f), px(7.0f));
 
             popClip();
         }
@@ -481,10 +517,10 @@ namespace screens
         const float cy = S.horizon - radius * (0.15f + 0.45f * e); // it rises a little as Home appears
         pushOpacity(hero);
         stars(S);
-        sun(S, cx, cy, radius);
-        jets(S); // in front of the sun; behind the cloud streaks and the towers
+        jets(S);
         clouds(S, cx, radius);
         skyline(S, true);
+        maccateams(S, cx, cy, radius, hero);
         sea(S, cx, radius);
         popOpacity();
 

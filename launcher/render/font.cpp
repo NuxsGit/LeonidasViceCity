@@ -367,6 +367,35 @@ namespace render
         glyph({x, y, float(g.w), float(g.h)}, uv, color);
     }
 
+    bool atlasUploadMask(int w, int h, const uint8_t *coverage, float uv[4])
+    {
+        if (w <= 0 || h <= 0 || !coverage)
+            return false;
+        int x = 0, y = 0;
+        if (!atlasPlace(w, h, x, y))
+        {
+            atlas.clearPending = true;
+            return false;
+        }
+        for (int row = 0; row < h; ++row)
+            std::memcpy(&atlas.pixels[size_t(y + row) * size_t(atlas.size) + size_t(x)],
+                        &coverage[size_t(row) * size_t(w)], size_t(w));
+        atlas.dirtyX0 = std::min(atlas.dirtyX0, x);
+        atlas.dirtyY0 = std::min(atlas.dirtyY0, y);
+        atlas.dirtyX1 = std::max(atlas.dirtyX1, x + w);
+        atlas.dirtyY1 = std::max(atlas.dirtyY1, y + h);
+        uv[0] = float(x);
+        uv[1] = float(y);
+        uv[2] = float(x + w);
+        uv[3] = float(y + h);
+        return true;
+    }
+
+    uint32_t atlasGeneration()
+    {
+        return atlas.generation;
+    }
+
     std::string ellipsize(Font font, float px, std::string_view text, float width)
     {
         if (measure(font, px, text) <= width)
