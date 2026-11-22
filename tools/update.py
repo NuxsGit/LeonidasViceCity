@@ -65,7 +65,12 @@ def get_channel(requested=None, mine=None):
 
 
 def fetch_github_api(url):
-    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "LVCS-update"})
+    req = urllib.request.Request(url, headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "LVCS-update",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+    })
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.load(r)
@@ -119,32 +124,42 @@ def parse_release_data(data):
 
 def latest(repo, channel="auto"):
     repo = repo or DEFAULT_REPO
+    all_rel = fetch_github_api("https://api.github.com/repos/%s/releases" % repo) or []
+
     if channel == "nightly":
+        for r in all_rel:
+            if r.get("tag_name") == "nightly" or r.get("prerelease"):
+                parsed = parse_release_data(r)
+                if parsed and parsed.get("zip"):
+                    return parsed
         data = fetch_github_api("https://api.github.com/repos/%s/releases/tags/nightly" % repo)
-        if not data:
-            all_rel = fetch_github_api("https://api.github.com/repos/%s/releases" % repo) or []
-            nightly_rel = [r for r in all_rel if r.get("tag_name") == "nightly" or r.get("prerelease")]
-            if nightly_rel:
-                data = nightly_rel[0]
         return parse_release_data(data)
 
     if channel == "stable":
+        for r in all_rel:
+            if not r.get("prerelease") and r.get("tag_name") != "nightly":
+                parsed = parse_release_data(r)
+                if parsed and parsed.get("zip"):
+                    return parsed
         data = fetch_github_api("https://api.github.com/repos/%s/releases/latest" % repo)
-        if not data:
-            all_rel = fetch_github_api("https://api.github.com/repos/%s/releases" % repo) or []
-            stable_rel = [r for r in all_rel if not r.get("prerelease") and r.get("tag_name") != "nightly"]
-            if stable_rel:
-                data = stable_rel[0]
         return parse_release_data(data)
 
-    # auto channel: prefer latest stable; if none exists, fall back to nightly
+    # auto channel: prefer newest stable with valid platform asset
+    for r in all_rel:
+        if not r.get("prerelease") and r.get("tag_name") != "nightly":
+            parsed = parse_release_data(r)
+            if parsed and parsed.get("zip"):
+                return parsed
+
+    # fall back to any release with valid platform asset
+    for r in all_rel:
+        parsed = parse_release_data(r)
+        if parsed and parsed.get("zip"):
+            return parsed
+
     data = fetch_github_api("https://api.github.com/repos/%s/releases/latest" % repo)
     if not data:
         data = fetch_github_api("https://api.github.com/repos/%s/releases/tags/nightly" % repo)
-    if not data:
-        all_rel = fetch_github_api("https://api.github.com/repos/%s/releases" % repo) or []
-        if all_rel:
-            data = all_rel[0]
     return parse_release_data(data)
 
 
