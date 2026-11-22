@@ -1,0 +1,11 @@
+{
+  "id": "modern_pc_controls",
+  "name": "Modern PC Controls & Quality of Life",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Gameplay",
+  "description": "Modern third-person free-look camera, PC mouse aim with sensitivity curves, instant weapon cycling, unlimited sprint, and automatic intro skip.",
+  "enabled": true,
+  "priority": 70,
+  "tags": ["controls", "mouse", "camera", "qol"]
+}

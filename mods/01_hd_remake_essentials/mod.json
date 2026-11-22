@@ -1,0 +1,11 @@
+{
+  "id": "hd_remake_essentials",
+  "name": "Vice City HD Remake Essentials",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Visuals",
+  "description": "Complete visual remaster preset: crystal clear timecycle, deep neon sunset lighting, high resolution particle effects, extended draw distance, and authentic Vice City atmosphere.",
+  "enabled": true,
+  "priority": 100,
+  "tags": ["graphics", "hd", "remake", "atmosphere"]
+}
