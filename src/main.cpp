@@ -366,9 +366,10 @@ namespace
     // Balanced (until 2026-11-14 "Widescreen, light" at 1x; the user asked for the name and 2x).
     const Preset kBalanced[] = {{"display.aspect", 0}, {"display.hud", 2},    {"display.scale", 2},  {"display.msaa", 1},
                                 {"display.aniso", 4},  {"display.timing", 1}, {"display.fps", 60}, {"display.vsync", kVsyncDefault}};
-    // LVCS HD Remake (Next-Gen Vice City Stories Experience)
-    const Preset kHdRemake[] = {{"display.aspect", 0}, {"display.hud", 2},    {"display.scale", 4},  {"display.msaa", 4},
-                                {"display.aniso", 16}, {"display.timing", 1}, {"display.fps", 60}, {"display.vsync", kVsyncDefault},
+    // LVCS HD Remake (Next-Gen Vice City Stories Experience - 16:9 & Ultrawide)
+    const Preset kHdRemake[] = {{"display.aspect", 0}, {"display.hud", 2},    {"display.cutscene_bars", 0},
+                                {"display.scale", 4},  {"display.msaa", 4},   {"display.aniso", 16},
+                                {"display.timing", 1}, {"display.fps", 60},    {"display.vsync", kVsyncDefault},
                                 {"enhance.traffic", 250}, {"enhance.peds", 250}, {"enhance.draw_distance", 300}};
     const char *const kPresetKeys[] = {"display.aspect", "display.hud", "display.cutscene_bars", "display.scale", "display.msaa",
                                        "display.aniso",  "display.timing", "display.fps", "display.vsync"};

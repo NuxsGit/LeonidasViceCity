@@ -1,0 +1,11 @@
+{
+  "id": "vcs_hd_remake_ultrawide",
+  "name": "GTA Vice City Stories HD Remake (16:9 & Ultrawide)",
+  "version": "1.0.0",
+  "author": "Leonidas Remake Team",
+  "category": "Visuals",
+  "description": "Next-Gen Vice City Stories Remake Overhaul: Hor+ 16:9 / 21:9 Ultrawide / 32:9 Super Ultrawide dynamic camera, screen-edge anchored HUD, 4K texture support, physics delta timing, responsive modern vehicle handling, and vibrant Miami synthwave atmosphere.",
+  "enabled": true,
+  "priority": 120,
+  "tags": ["remake", "widescreen", "ultrawide", "16:9", "21:9", "32:9", "graphics", "physics", "hd"]
+}

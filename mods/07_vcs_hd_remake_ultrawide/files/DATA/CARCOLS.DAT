@@ -1,0 +1,43 @@
+# GTA Vice City Stories HD Remake - Miami Synthwave Vehicle Colors
+# Neon Pink, Turquoise Teal, Coral Orange, Pearl White, Midnight Purple, Electric Blue
+col
+0,0,0           # 0 black
+245,245,255     # 1 pearl white
+237,30,121      # 2 neon pink (Leonidas signature)
+41,171,226      # 3 electric cyan / turquoise
+247,147,30      # 4 sunset gold / orange
+102,45,145      # 5 synthwave royal purple
+220,20,60       # 6 miami sunset red
+46,204,113      # 7 palm green
+241,196,15      # 8 miami sun yellow
+52,73,94        # 9 midnight metallic
+142,68,173      # 10 deep violet
+26,188,156      # 11 pastel teal
+230,126,34      # 12 peach orange
+189,195,199     # 13 silver metallic
+127,140,141     # 14 gunmetal gray
+255,105,180     # 15 hot pink
+end
+car
+infernus, 2,1, 3,1, 1,0, 4,0, 5,1, 6,1
+cheetah, 1,0, 2,0, 3,0, 6,0, 4,0, 5,1
+banshee, 2,1, 3,1, 1,2, 4,1, 5,1, 6,1
+phoenix, 2,0, 4,0, 5,1, 6,1, 0,2, 1,3
+stinger, 2,1, 3,1, 6,1, 4,0, 1,0, 5,1
+comet, 3,1, 2,1, 1,0, 4,1, 5,1, 6,0
+deluxo, 13,13, 14,14, 2,1, 3,1, 4,1
+stallion, 2,0, 4,1, 6,0, 1,0, 5,1
+sabre, 2,1, 4,1, 3,1, 6,1, 5,1, 1,0
+sabretur, 2,0, 4,0, 3,0, 5,1, 6,0
+admiral, 1,1, 0,0, 13,13, 9,9, 3,1, 2,1
+sentinel, 1,1, 0,0, 13,13, 9,9, 3,1, 2,1
+sentxs, 0,0, 9,9, 2,1, 3,1, 14,14
+patriot, 14,14, 9,9, 1,1, 0,0
+landstal, 1,1, 13,13, 9,9, 3,1, 2,1
+pcj600, 2,1, 3,1, 4,1, 6,1, 5,1, 1,0
+sanchez, 2,1, 3,1, 4,1, 7,1, 6,1
+faggio, 2,1, 3,1, 4,1, 11,1, 15,1
+squalo, 2,1, 3,1, 1,2, 4,1, 6,1
+maverick, 2,1, 3,1, 1,0, 4,1, 6,1
+hunter, 14,14, 9,9, 0,0
+end

@@ -1,0 +1,14 @@
+; GTA Vice City Stories HD Remake - Surface Friction & Physics Data
+; Ident Adhesion TyresFx
+TARMAC          1.00  1
+TARMAC_ROUGH    0.95  1
+GRASS           0.75  2
+GRAVEL          0.70  3
+MUD_SOFT        0.60  4
+SAND            0.65  5
+SAND_DENSE      0.72  5
+PAVEMENT        0.98  1
+BEACH           0.68  5
+WATER           0.20  6
+WOOD            0.90  1
+METAL           0.92  1

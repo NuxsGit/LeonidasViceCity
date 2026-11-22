@@ -1,0 +1,4 @@
+# GTA Vice City Stories HD Remake - Ocean & Water Configuration
+# Clear turquoise waters for Miami Beach and bay
+# X_min Y_min Z_min X_max Y_max Z_max R G B A
+-3000.0 -3000.0 -1.0 3000.0 3000.0 0.5 41 171 226 210
