@@ -41,40 +41,40 @@ namespace theme
     };
 
     inline constexpr Palette kDarkPalette{
-        .night = rgb(0x0A0A0B),
-        .base = rgb(0x101012),
-        .surface = rgb(0x17171A),
-        .surfaceHi = rgb(0x1F1F23),
-        .surfaceTop = rgb(0x2A2A2F),
-        .text = rgb(0xF6F4F5),
-        .dim = rgb(0xA9A5A8),
-        .faint = rgb(0x6E6A6D),
-        .pink = rgb(0xFF2E8B),
-        .pinkHi = rgb(0xFF62A8),
+        .night = rgb(0x0A0A0C),
+        .base = rgb(0x101014),
+        .surface = rgb(0x17171C),
+        .surfaceHi = rgb(0x1F1F26),
+        .surfaceTop = rgb(0x2A2A33),
+        .text = rgb(0xF8F4F6),
+        .dim = rgb(0xADA6AC),
+        .faint = rgb(0x726B71),
+        .pink = rgb(0xED1E79),   // Leonidas Mascot Hot Pink
+        .pinkHi = rgb(0xFF4C9D), // Leonidas Lighter Neon Pink
         .onPink = rgb(0xFFFFFF),
-        .teal = rgb(0x3DDBC6),
-        .amber = rgb(0xF5B544),
+        .teal = rgb(0x29ABE2),   // Leonidas Electric Cyan
+        .amber = rgb(0xF7931E),  // Leonidas Sunset Gold
         .red = rgb(0xF26868),
         .ink = rgb(0xFFFFFF),
         .shadow = rgb(0x000000),
-        .scrim = rgb(0x050405, 180),
+        .scrim = rgb(0x050406, 180),
         .errorFill = rgb(0x26131A),
         .doneFill = rgb(0x12211E),
         .dangerFill = rgb(0x3A1C25),
         .dangerFillHi = rgb(0x4A222E),
         .dangerText = rgb(0xFFC9C9),
         .logFill = rgb(0x0C0C0E),
-        .well = rgb(0x131315),
-        .wellBottom = rgb(0x0E0E10),
-        .wellGlow = rgb(0x2C0F1F),
-        .wellGlowBottom = rgb(0x210B17),
-        .sky = rgb(0x140A0F),
-        .sea = rgb(0x0F080B),
-        .horizon = rgb(0x3A0E24),
-        .skyline = rgb(0x0B0709),
-        .cloud = rgb(0x1E0B15),
-        .lights = rgb(0xFFB8D6),
-        .contrail = rgb(0xFFC2DA),
+        .well = rgb(0x131317),
+        .wellBottom = rgb(0x0E0E12),
+        .wellGlow = rgb(0x2E112A),
+        .wellGlowBottom = rgb(0x210B1E),
+        .sky = rgb(0x150A1A),     // Leonidas Synthwave Night
+        .sea = rgb(0x0D0612),
+        .horizon = rgb(0x421235), // Leonidas Purple-Pink Horizon
+        .skyline = rgb(0x0C060E),
+        .cloud = rgb(0x220D1E),
+        .lights = rgb(0xFF9EC8),
+        .contrail = rgb(0xFFC4E0),
     };
 
     inline constexpr Palette kLightPalette{

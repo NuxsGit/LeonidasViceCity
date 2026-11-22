@@ -813,6 +813,24 @@ namespace
         s.onChange = [](int v) { vcs::mods::HdTextureManager::instance().setEnabled(v != 0); };
         settings::add(s);
 
+        // Individual toggle switches for all installed mods in the F2 Settings menu
+        for (const auto &m : vcs::mods::ModManager::instance().mods())
+        {
+            s = {};
+            s.key = "mod." + m.id;
+            s.page = "Mods & Remake";
+            s.section = "Installed Mods";
+            s.label = m.name;
+            s.help = m.description + " [" + m.category + "]";
+            s.type = Type::Toggle;
+            s.defaultValue = m.enabled ? 1 : 0;
+            std::string modId = m.id;
+            s.onChange = [modId](int v) {
+                vcs::mods::ModManager::instance().setModEnabled(modId, v != 0);
+            };
+            settings::add(s);
+        }
+
         s = {};
         s.key = "graphics.perf_overlay";
         s.page = "Advanced";

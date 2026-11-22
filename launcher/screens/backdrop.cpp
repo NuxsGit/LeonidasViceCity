@@ -16,6 +16,7 @@ namespace screens
 {
     using namespace render;
     using core::mix;
+    using core::rgb;
     using core::withAlpha;
 
     namespace
@@ -221,19 +222,20 @@ namespace screens
 
         void sun(const Scene &S, float cx, float cy, float radius)
         {
-            // its glow over the horizon, two layers
-            shadow({cx - radius * 1.3f, cy - radius * 1.2f, radius * 2.6f, radius * 2.4f}, withAlpha(theme::kPinkHi, 0.16f), radius * 0.6f, radius);
-            shadow({cx - radius * 1.05f, cy - radius * 1.05f, radius * 2.1f, radius * 2.1f}, withAlpha(theme::kPink, 0.22f), radius * 0.18f, radius);
+            // Leonidas synthwave glowing sun aura
+            shadow({cx - radius * 1.35f, cy - radius * 1.25f, radius * 2.7f, radius * 2.5f}, withAlpha(rgb(0xED1E79), 0.25f), radius * 0.65f, radius);
+            shadow({cx - radius * 1.1f, cy - radius * 1.1f, radius * 2.2f, radius * 2.2f}, withAlpha(rgb(0x662D91), 0.30f), radius * 0.25f, radius);
 
-            // the disc, solid above its middle, then in slices sliding down into the horizon; the slices thin and the
-            // gaps between them widen toward it
+            // Disc with Leonidas gradient: Purple -> Neon Pink -> Sunset Gold
             const Rect disc{cx - radius, cy - radius, radius * 2, radius * 2};
-            const Color top = mix(theme::kPinkHi, theme::kOnPink, 0.22f), bottom = theme::kPink;
+            const Color top = rgb(0x662D91), mid = rgb(0xED1E79), bottom = rgb(0xF7931E);
             const float from = std::round(cy - radius * 0.05f), span = S.horizon - from;
             pushClip({0, 0, S.w, S.horizon});
             pushClip({0, disc.y, S.w, from - disc.y});
-            gradient(disc, top, bottom, radius);
+            gradient(disc, top, mid, radius);
             popClip();
+
+            // Sliding retro synthwave bands below the mid line
             constexpr int kBands = 6;
             const float slide = S.t * 0.10f - std::floor(S.t * 0.10f);
             auto yAt = [&](float u) { return from + span * u * (1.35f - 0.35f * u); };
@@ -245,9 +247,69 @@ namespace screens
                 if (y1 <= y0)
                     continue;
                 pushClip({0, y0, S.w, y1 - y0});
-                gradient(disc, top, bottom, radius);
+                gradient(disc, mid, bottom, radius);
                 popClip();
             }
+
+            // --- LEONIDAS MASCOT (Macca the Alligator) ---
+            // Scaled dynamically with the rising sun and animated along with it
+            const float scale = radius / px(150.0f);
+            const float ox = cx - radius * 0.12f;
+            const float oy = cy - radius * 0.10f;
+
+            // Mascots base alligator head profile
+            const Rect headBase{ox - px(65) * scale, oy - px(55) * scale, px(160) * scale, px(100) * scale};
+            rect(headBase, withAlpha(rgb(0xED1E79), 0.90f), {px(40) * scale, px(20) * scale, px(12) * scale, px(45) * scale});
+
+            // Long snout pointing right
+            const Rect snout{ox + px(10) * scale, oy - px(16) * scale, px(105) * scale, px(52) * scale};
+            rect(snout, withAlpha(rgb(0xED1E79), 0.95f), {px(12) * scale, px(22) * scale, px(28) * scale, px(8) * scale});
+
+            // Alligator jaw contour
+            const Rect jaw{ox - px(25) * scale, oy + px(26) * scale, px(120) * scale, px(28) * scale};
+            rect(jaw, withAlpha(rgb(0x4B1248), 0.85f), {px(6) * scale, px(16) * scale, px(20) * scale, px(8) * scale});
+
+            // Grinning alligator sharp teeth
+            for (int t = 0; t < 5; ++t)
+            {
+                const float tx = ox + (px(20) + float(t) * px(15)) * scale;
+                const float ty = oy + px(22) * scale;
+                rect({tx, ty, px(6.5f) * scale, px(10.0f) * scale}, rgb(0xFFFFFF), px(1.5f) * scale);
+            }
+
+            // Cool 80s sunglasses
+            // Left lens
+            const Rect lensL{ox - px(20) * scale, oy - px(44) * scale, px(48) * scale, px(26) * scale};
+            rect(lensL, rgb(0x1F0B2E), px(4) * scale);
+            rect(lensL.inset(px(2) * scale), rgb(0x662D91), px(3) * scale);
+            line(lensL.x + px(5) * scale, lensL.bottom() - px(4) * scale,
+                 lensL.right() - px(6) * scale, lensL.y + px(5) * scale, px(2.5f) * scale, rgb(0xFFFFFF));
+
+            // Right lens (angled towards snout)
+            const Rect lensR{ox + px(34) * scale, oy - px(38) * scale, px(50) * scale, px(24) * scale};
+            rect(lensR, rgb(0x1F0B2E), px(4) * scale);
+            rect(lensR.inset(px(2) * scale), rgb(0x662D91), px(3) * scale);
+            line(lensR.x + px(5) * scale, lensR.bottom() - px(4) * scale,
+                 lensR.right() - px(6) * scale, lensR.y + px(5) * scale, px(2.5f) * scale, rgb(0x29ABE2));
+
+            // Sunglasses bridge
+            line(lensL.right(), oy - px(32) * scale, lensR.x, oy - px(30) * scale, px(3.5f) * scale, rgb(0x1F0B2E));
+
+            // Tropical cocktail glass with orange umbrella
+            const float gx = cx + radius * 0.44f;
+            const float gy = cy + radius * 0.32f;
+            const float gCorners[8] = {
+                gx - px(14) * scale, gy - px(12) * scale,
+                gx + px(14) * scale, gy - px(12) * scale,
+                gx + px(3) * scale, gy + px(10) * scale,
+                gx - px(3) * scale, gy + px(10) * scale,
+            };
+            quad(gCorners, withAlpha(rgb(0xFFE4F0), 0.80f));
+            line(gx, gy + px(10) * scale, gx, gy + px(24) * scale, px(2.2f) * scale, rgb(0xFFFFFF));
+            line(gx - px(9) * scale, gy + px(24) * scale, gx + px(9) * scale, gy + px(24) * scale, px(2.2f) * scale, rgb(0xFFFFFF));
+            line(gx + px(2) * scale, gy - px(2) * scale, gx + px(16) * scale, gy - px(20) * scale, px(2) * scale, rgb(0xF7931E));
+            arc(gx + px(16) * scale, gy - px(20) * scale, px(10) * scale, px(5) * scale, 3.14f, 2.4f, rgb(0xF7931E));
+
             popClip();
         }
 

@@ -378,6 +378,23 @@ namespace platform
             std::fprintf(stderr, "[platform] SDL_Init: %s\n", SDL_GetError());
             return false;
         }
+
+        // Universal Gamepad Mod: load community mappings from mod or root database
+        const char *dbPaths[] = {
+            "mods/06_universal_gamepad_support/gamecontrollerdb.txt",
+            "gamecontrollerdb.txt"
+        };
+        for (const char *path : dbPaths)
+        {
+            if (FILE *f = std::fopen(path, "r"))
+            {
+                std::fclose(f);
+                int added = SDL_AddGamepadMappingsFromFile(path);
+                if (added > 0)
+                    std::fprintf(stderr, "[platform] universal gamepad: loaded %d mappings from %s\n", added, path);
+                break;
+            }
+        }
         if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
             std::fprintf(stderr, "[platform] no audio: %s\n", SDL_GetError());
 

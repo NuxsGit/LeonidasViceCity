@@ -5,6 +5,7 @@
     "neon_vice_postfx": true,
     "hd_hud_and_ui": true,
     "modern_pc_controls": true,
-    "extreme_city_life": true
+    "extreme_city_life": true,
+    "universal_gamepad": true
   }
 }

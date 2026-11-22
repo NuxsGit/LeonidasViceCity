@@ -1,0 +1,11 @@
+{
+  "id": "universal_gamepad",
+  "name": "Universal Gamepad & Controller Support",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Controls",
+  "description": "Universal plug & play controller support: DualSense PS5, DualShock 4, Xbox Series/One/360, Switch Pro, and generic DirectInput/HID gamepads with rumble and hotplug.",
+  "priority": 95,
+  "enabled": true,
+  "tags": ["controls", "gamepad", "dualsense", "xbox", "switch", "hotplug", "rumble"]
+}

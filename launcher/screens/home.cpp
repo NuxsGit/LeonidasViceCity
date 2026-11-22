@@ -59,7 +59,7 @@ namespace screens
         float y = r.y + std::max(px(40), r.h * 0.17f);
 
         pushReveal(since, 0);
-        ui::eyebrow(left, y, theme::kPink, "GRAND THEFT AUTO");
+        ui::eyebrow(left, y, theme::kPink, "LEONIDAS VICE CITY STORIES");
         popReveal();
         y += px(24);
         pushReveal(since, 1);
@@ -75,7 +75,7 @@ namespace screens
         }
         popReveal();
         pushReveal(since, 2);
-        ui::label(kFontBody, px(16), {left, y, colW, px(26)}, theme::kDim, "The PS2 classic, recompiled for this PC.");
+        ui::label(kFontBody, px(16), {left, y, colW, px(26)}, theme::kDim, "Portage PC HD Remake \xC2\xB7 Modding VFS \xC2\xB7 Recompilation PS2.");
         popReveal();
         y += px(48);
 
@@ -122,9 +122,20 @@ namespace screens
         {
             // an update is offered, never forced: Play stays the big button (the game that is built still runs), the
             // update a quieter one under it (the user's choice, 2026-11-01)
-            primary = ui::button("Play", fit("Play", theme::icon::kPlay), ButtonStyle::Primary, theme::icon::kPlay, true, heroSize, kFontBrand);
+            const Rect playBtn = fit("Play", theme::icon::kPlay);
+            primary = ui::button("Play", playBtn, ButtonStyle::Primary, theme::icon::kPlay, true, heroSize, kFontBrand);
             if (primary || (platform::input.key(platform::kKeyEnter) && !ui::state.focusVisible && ui::inputAllowed()))
                 play(app);
+
+            // Leonidas Multiplayer button
+            const float mpW = ui::buttonWidth("Multijoueur", theme::icon::kGame, 0, kFontSemibold, "BIENT\xC3\x94T");
+            const Rect mpBtn{playBtn.right() + px(16), playBtn.y + (playBtn.h - px(44)) * 0.5f, mpW, px(44)};
+            if (ui::button("Multijoueur", mpBtn, ButtonStyle::Secondary, theme::icon::kGame, true, 0, kFontSemibold, "BIENT\xC3\x94T"))
+            {
+                app.say("Multijoueur Leonidas (LVCS-MP) : En cours de d\xC3\xA9veloppement. Bient\xC3\xB4t disponible !");
+            }
+            ui::tooltip(ui::id("Multijoueur"), mpBtn, "Mode Multijoueur en ligne Leonidas (LVCS-MP) \xE2\x80\x94 Bient\xC3\xB4t disponible !");
+
             // the update says it is new with a badge; why, in its tooltip
             y += big.h + px(14);
             constexpr const char *kUpdate = "Update the build";
@@ -141,9 +152,20 @@ namespace screens
         }
         else if (next == "play")
         {
-            primary = ui::button("Play", fit("Play", theme::icon::kPlay), ButtonStyle::Primary, theme::icon::kPlay, true, heroSize, kFontBrand);
+            const Rect playBtn = fit("Play", theme::icon::kPlay);
+            primary = ui::button("Play", playBtn, ButtonStyle::Primary, theme::icon::kPlay, true, heroSize, kFontBrand);
             if (primary || (platform::input.key(platform::kKeyEnter) && !ui::state.focusVisible && ui::inputAllowed()))
                 play(app);
+
+            // Leonidas Multiplayer button
+            const float mpW = ui::buttonWidth("Multijoueur", theme::icon::kGame, 0, kFontSemibold, "BIENT\xC3\x94T");
+            const Rect mpBtn{playBtn.right() + px(16), playBtn.y + (playBtn.h - px(44)) * 0.5f, mpW, px(44)};
+            if (ui::button("Multijoueur", mpBtn, ButtonStyle::Secondary, theme::icon::kGame, true, 0, kFontSemibold, "BIENT\xC3\x94T"))
+            {
+                app.say("Multijoueur Leonidas (LVCS-MP) : En cours de d\xC3\xA9veloppement. Bient\xC3\xB4t disponible !");
+            }
+            ui::tooltip(ui::id("Multijoueur"), mpBtn, "Mode Multijoueur en ligne Leonidas (LVCS-MP) \xE2\x80\x94 Bient\xC3\xB4t disponible !");
+
             below = buildSummary(app);
         }
         else
