@@ -17,18 +17,20 @@ namespace screens
     {
         void logo(float cx, float cy, float r)
         {
-            // the icon's sun, small: a gradient disc cut by two stripes, over a sea line
+            // Leonidas mini neon emblem: purple crown, hot pink center, cyan base
             const Rect disc{cx - r, cy - r, r * 2, r * 2};
-            const float cut1 = cy + r * 0.18f, cut2 = cy + r * 0.48f;
+            const float cut1 = cy + r * 0.12f, cut2 = cy + r * 0.45f;
             pushClip({disc.x, disc.y, disc.w, cut1 - disc.y});
-            gradient(disc, theme::kPinkHi, theme::kPink, r);
+            gradient(disc, rgb(0x662D91), theme::kPink, r);
             popClip();
-            pushClip({disc.x, cut1 + r * 0.12f, disc.w, cut2 - cut1 - r * 0.12f});
-            gradient(disc, theme::kPinkHi, theme::kPink, r);
+            pushClip({disc.x, cut1 + r * 0.10f, disc.w, cut2 - cut1 - r * 0.10f});
+            gradient(disc, theme::kPink, theme::kPinkHi, r);
             popClip();
-            pushClip({disc.x, cut2 + r * 0.16f, disc.w, r});
-            gradient(disc, theme::kPinkHi, theme::kPink, r);
+            pushClip({disc.x, cut2 + r * 0.14f, disc.w, r});
+            gradient(disc, theme::kPinkHi, rgb(0x29ABE2), r);
             popClip();
+            // Tiny neon sunglasses accent
+            line(cx - r * 0.55f, cy - r * 0.15f, cx + r * 0.55f, cy - r * 0.15f, px(1.8f), rgb(0xFFFFFF));
         }
 
         bool windowButton(std::string_view idLabel, char32_t icon, Rect r, bool close)
@@ -92,8 +94,8 @@ namespace screens
 #endif
         logo(left.x + px(9), bar.cy(), px(8));
         core::cutLeft(left, px(28));
-        const float nameW = measure(kFontSemibold, px(12.5f), "Vice City Stories");
-        label(kFontSemibold, px(12.5f), {left.x, bar.y, nameW + px(2), h}, focused ? theme::kText : theme::kDim, "Vice City Stories");
+        const float nameW = measure(kFontSemibold, px(12.5f), "Leonidas ViceCityStories");
+        label(kFontSemibold, px(12.5f), {left.x, bar.y, nameW + px(2), h}, focused ? theme::kText : theme::kDim, "Leonidas ViceCityStories");
         label(kFontBody, px(12.5f), {left.x + nameW + px(8), bar.y, px(200), h}, theme::kFaint,
               "PC port  \xC2\xB7  " + app.sourceVersion);
 

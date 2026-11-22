@@ -1,0 +1,21 @@
+// Leonidas ViceCityStories (LVCS) - HD Remake Timecycle Preset
+// Crystal clear 80s neon sky, deep synthwave sunsets, enhanced draw distance and vibrant lighting.
+// Amb_R Amb_G Amb_B  Dir_R Dir_G Dir_B  SkyTop_R SkyTop_G SkyTop_B  SkyBot_R SkyBot_G SkyBot_B  SunCore_R SunCore_G SunCore_B  SunCorona_R SunCorona_G SunCorona_B  SunSz SprSz SprBrt Shdw LtShdw FogFar
+// Midnight (00:00)
+ 20  24  42   30  35  60   12  10  28   35  18  48   240 240 255   210 180 240  8  12  80  40  25  1800.0
+// Night (05:00)
+ 25  28  48   40  42  70   20  15  40   50  25  65   255 240 220   230 190 250  9  14  85  45  28  1900.0
+// Sunrise (06:00)
+ 80  50  70  140  90  80   85  45 120  240 110  75   255 210 150   255 140  90 14  24 100  60  35  2200.0
+// Morning (07:00)
+110 100 120  180 160 140   60  95 180  245 160 110   255 245 200   255 180 110 12  20  95  75  45  2500.0
+// Midday (12:00)
+140 145 160  240 235 220   35 120 225  175 215 255   255 255 240   255 235 180 10  16  90  85  50  3200.0
+// Afternoon (18:00)
+130 110 125  220 160 110   55  80 180  250 145  85   255 215 140   255 160  80 13  22  98  80  48  2800.0
+// Sunset (19:00) - Deep Leonidas 80s Synthwave Sunset
+ 95  48  85  180  75  95  105  30 145  245  75  90   255 140 180   255 100 150 16  28 110  70  40  2400.0
+// Dusk (20:00)
+ 45  35  65   85  55  80   45  22  80  130  40  95   255 160 210   210 100 170 11  18  90  55  32  2000.0
+// Night (22:00)
+ 22  25  45   32  38  65   15  12  32   40  20  52   245 245 255   215 185 245  8  12  80  40  25  1800.0

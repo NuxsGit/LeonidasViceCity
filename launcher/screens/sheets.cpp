@@ -286,14 +286,14 @@ namespace screens
 
             // Master HD Remake Switch
             {
-                const float cardH = px(56);
-                const Rect card{r.x - px(8), y, r.w + px(16), cardH};
+                const float cardH = px(64);
+                const Rect card{r.x, y, r.w, cardH};
                 rectEx(card, theme::kBase, mix(theme::kBase, theme::kPink, 0.15f), px(theme::kRadiusSmall), theme::ink(0.08f), ui::hairline());
-                drawText(kFontSemibold, px(theme::kBody), card.x + px(14), card.y + px(16), theme::kText, "LVCS HD Remake Engine");
-                drawText(kFontBody, px(theme::kSmall), card.x + px(14), card.y + px(34), theme::kDim, "Activates 4K textures, 80s neon shaders & ultra detail");
+                drawText(kFontSemibold, px(theme::kBody), card.x + px(14), card.y + px(14), theme::kText, "LVCS HD Remake Engine");
+                ui::label(kFontBody, px(theme::kSmall), {card.x + px(14), card.y + px(36), card.w - px(70), px(20)}, theme::kDim, "Activates 4K textures, 80s neon shaders & ultra detail");
 
                 bool active = app.hdRemakePreset;
-                const Rect toggleR{card.right() - px(52), card.y + px(12), px(40), px(28)};
+                const Rect toggleR{card.right() - px(46), card.y + (cardH - px(26)) * 0.5f, px(38), px(26)};
                 if (ui::toggle("#hd-remake-master-toggle", toggleR, active, true))
                 {
                     app.applyHdRemakePreset(active);
@@ -315,30 +315,33 @@ namespace screens
                 for (size_t i = 0; i < app.mods.size(); ++i)
                 {
                     auto &m = app.mods[i];
-                    const float cardH = px(64);
-                    const Rect card{r.x - px(8), y, r.w + px(16), cardH};
+                    const float cardH = px(74);
+                    const Rect card{r.x, y, r.w, cardH};
                     rectEx(card, theme::kBase, mix(theme::kBase, theme::kNight, 0.4f), px(theme::kRadiusSmall), theme::ink(0.05f), ui::hairline());
 
-                    // Mod Title & Category
-                    drawText(kFontSemibold, px(theme::kBody), card.x + px(14), card.y + px(14), theme::kText, m.name);
+                    // Mod Category Pill (aligned before switch)
                     const std::string tag = m.category;
                     const float pw = ui::pillWidth(tag);
-                    const Color tagCol = m.category == "Visuals" ? theme::kPink : m.category == "UI" ? theme::kTeal : theme::kAmber;
-                    ui::pill({card.x + px(18) + measure(kFontSemibold, px(theme::kBody), m.name), card.y + px(12), pw, px(18)}, tag, tagCol);
+                    const Color tagCol = m.category == "Visuals" ? theme::kPink : m.category == "UI" ? theme::kTeal : m.category == "Controls" ? theme::kAmber : theme::kPinkHi;
+                    const float pillX = card.right() - pw - px(56);
+                    ui::pill({pillX, card.y + px(14), pw, px(18)}, tag, tagCol);
 
-                    // Mod Description
-                    drawText(kFontBody, px(theme::kSmall), card.x + px(14), card.y + px(34), theme::kDim, m.description);
+                    // Mod Title (clipped cleanly so it never touches the pill)
+                    ui::label(kFontSemibold, px(theme::kBody), {card.x + px(14), card.y + px(12), pillX - card.x - px(20), px(22)}, theme::kText, m.name);
+
+                    // Mod Description (limited width so it never touches the toggle)
+                    ui::label(kFontBody, px(theme::kSmall), {card.x + px(14), card.y + px(38), card.w - px(70), px(24)}, theme::kDim, m.description);
 
                     // Mod Toggle
                     bool enabled = m.enabled;
                     const std::string toggleId = "#mod-toggle-" + m.id;
-                    const Rect toggleR{card.right() - px(52), card.y + px(18), px(40), px(28)};
+                    const Rect toggleR{card.right() - px(46), card.y + (cardH - px(26)) * 0.5f, px(38), px(26)};
                     if (ui::toggle(toggleId, toggleR, enabled, true))
                     {
                         app.setModEnabled(m.id, enabled);
                     }
 
-                    y += cardH + px(8);
+                    y += cardH + px(10);
                 }
             }
 
@@ -384,7 +387,7 @@ namespace screens
         if (scrim.clicked)
             shell.sheet = Sheet::None;
 
-        const float width = std::min(px(480), area.w * 0.9f);
+        const float width = std::min(px(540), area.w * 0.94f);
         const Rect panel{area.right() - width * open, area.y, width, area.h};
         ui::blockInput(panel);
         shadow(panel.offset(-px(6), 0), theme::shade(0.8f * core::clamp01(open)), px(24), 0);
