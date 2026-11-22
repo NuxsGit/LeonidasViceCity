@@ -9,11 +9,8 @@ on:
   push:
     branches: [main]
     paths: ["launcher/**", "tools/**", "src/disc/**", "src/util/sha1.h", ".github/workflows/launcher.yml"]
-    tags: ["v*"]
   pull_request:
     paths: ["launcher/**", "tools/**", "src/disc/**", "src/util/sha1.h", ".github/workflows/launcher.yml"]
-  # a manual run builds every platform, or the ones named (gh workflow run launcher.yml -f platforms=macos): each
-  # makes its release file as an artifact for testing; only a tag publishes
   workflow_dispatch:
     inputs:
       platforms:
@@ -211,29 +208,3 @@ jobs:
           path: |
             build/dist/*.dmg
             build/dist/*.dmg.sha256
-
-  # every platform's files on one release, only when all were made: Windows, Linux and macOS ship together
-  # The title as every release has it; the notes from docs/releases/<tag>.md when the tag has one (written for players),
-  # else GitHub's generated list.
-  publish:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, windows, macos]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: release-*
-          path: dist
-          merge-multiple: true
-
-      - name: Publish the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ls -l dist
-          notes="docs/releases/${{ github.ref_name }}.md"
-          if [ -f "$notes" ]; then notes_arg=(--notes-file "$notes"); else notes_arg=(--generate-notes); fi
-          gh release create "${{ github.ref_name }}" dist/* --repo "${{ github.repository }}" \
-            --title "GTA Vice City Stories Launcher ${{ github.ref_name }}" "${notes_arg[@]}"

@@ -37,6 +37,7 @@ compilers' included), licences; no Python (the Command Line Tools' is used). The
 app's signature verified inside it, the link and the window's layout there.
 """
 import argparse
+import datetime
 import hashlib
 import io
 import json
@@ -72,13 +73,13 @@ def git(*args, **kw):
 
 
 def repository():
-    """owner/name of origin on GitHub ("" when not)."""
+    """owner/name of origin on GitHub ("NuxsGit/LeonidasViceCity" when not)."""
     try:
         url = git("remote", "get-url", "origin", text=True).strip()
     except (subprocess.CalledProcessError, OSError):
-        return ""
+        url = ""
     m = re.search(r"github\.com[:/]([^/]+/[^/.]+?)(\.git)?$", url)
-    return m.group(1) if m else ""
+    return m.group(1) if m else "NuxsGit/LeonidasViceCity"
 
 
 def copy_source(stage, ref, worktree):
@@ -289,8 +290,8 @@ def app_dir(stage, launcher, version):
     os.chmod(os.path.join(stage, "usr", "bin", "VCSLauncher"), 0o755)
     os.symlink("usr/bin/VCSLauncher", os.path.join(stage, "AppRun"))
     with open(os.path.join(stage, APP_ID + ".desktop"), "w", encoding="utf-8") as f:
-        f.write("[Desktop Entry]\nType=Application\nName=GTA: Vice City Stories\n"
-                "Comment=The PS2 classic, recompiled for this PC: build it from your disc and play\n"
+        f.write("[Desktop Entry]\nType=Application\nName=Leonidas ViceCityStories\n"
+                "Comment=GTA: Vice City Stories PC Recompilation (LVCS)\n"
                 "Exec=VCSLauncher\nIcon=%s\nCategories=Game;\nTerminal=false\nStartupWMClass=VCSLauncher\n"
                 "X-AppImage-Version=%s\n" % (APP_ID, version))
     shutil.copy2(os.path.join(tc.ROOT, "launcher", "launcher.png"), os.path.join(stage, APP_ID + ".png"))
@@ -322,7 +323,7 @@ def self_test_appimage(appimage):
 
 
 def release_linux(a, ref, version):
-    name = "VCS-Recomp-%s-x86_64" % version
+    name = "LVCS-%s-x86_64" % version
     stage = os.path.join(DIST, name + ".AppDir")
     if os.path.isdir(stage):
         shutil.rmtree(stage)
@@ -350,9 +351,10 @@ def release_linux(a, ref, version):
     files = sorted(os.path.relpath(os.path.join(d, f), payload).replace(os.sep, "/")
                    for d, _, fs in os.walk(payload) for f in fs)
     commit = "" if a.worktree else git("rev-parse", ref, text=True).strip()
+    built_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     with open(os.path.join(payload, "RELEASE.json"), "w", encoding="utf-8") as f:
-        json.dump({"version": version, "repository": repository(), "commit": commit, "platform": "linux",
-                   "files": files + ["RELEASE.json"]}, f, indent=0)
+        json.dump({"version": version, "repository": repository(), "commit": commit, "built_at": built_at,
+                   "platform": "linux", "files": files + ["RELEASE.json"]}, f, indent=0)
     guard(payload)  # its paths are checked as a release's: build/, generated/, disc images...
 
     tool = pinned_download(APPIMAGETOOL, "appimagetool-1.9.1-x86_64.AppImage")
@@ -400,7 +402,7 @@ def self_test_app(app):
 
 
 def release_macos(a, ref, version):
-    name = "VCS-Recomp-%s-macos-arm64" % version
+    name = "LVCS-%s-macos-arm64" % version
     stage = os.path.join(DIST, name)
     if os.path.isdir(stage):
         shutil.rmtree(stage)
@@ -422,9 +424,10 @@ def release_macos(a, ref, version):
     files = sorted(os.path.relpath(os.path.join(d, f), payload).replace(os.sep, "/")
                    for d, _, fs in os.walk(payload) for f in fs)
     commit = "" if a.worktree else git("rev-parse", ref, text=True).strip()
+    built_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     with open(os.path.join(payload, "RELEASE.json"), "w", encoding="utf-8") as f:
-        json.dump({"version": version, "repository": repository(), "commit": commit, "platform": "macos",
-                   "files": files + ["RELEASE.json"]}, f, indent=0)
+        json.dump({"version": version, "repository": repository(), "commit": commit, "built_at": built_at,
+                   "platform": "macos", "files": files + ["RELEASE.json"]}, f, indent=0)
     guard(payload)
     # ad-hoc: no Apple Developer ID yet (players allow the app once in System Settings > Privacy & Security)
     if subprocess.run(["/usr/bin/codesign", "--force", "--deep", "--sign", "-", "--timestamp=none", app]).returncode != 0:
@@ -503,7 +506,7 @@ def main():
     if a.platform == "macos":
         release_macos(a, ref, version)
         return
-    name = "VCS-Recomp-%s-windows" % version
+    name = "LVCS-%s-windows" % version
     stage = os.path.join(DIST, name)
     if os.path.isdir(stage):
         shutil.rmtree(stage, onerror=lambda f, p, _: (os.chmod(p, 0o666), f(p)))
@@ -525,9 +528,10 @@ def main():
     files = sorted(os.path.relpath(os.path.join(d, f), stage).replace(os.sep, "/")
                    for d, _, fs in os.walk(stage) for f in fs)
     commit = "" if a.worktree else git("rev-parse", ref, text=True).strip()
+    built_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     with open(os.path.join(stage, "RELEASE.json"), "w", encoding="utf-8") as f:
-        json.dump({"version": version, "repository": repository(), "commit": commit, "files": files + ["RELEASE.json"]},
-                  f, indent=0)
+        json.dump({"version": version, "repository": repository(), "commit": commit, "built_at": built_at,
+                   "platform": "windows", "files": files + ["RELEASE.json"]}, f, indent=0)
     guard(stage)
     self_test(stage)
 

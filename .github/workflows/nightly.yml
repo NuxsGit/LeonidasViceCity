@@ -1,0 +1,165 @@
+name: nightly
+
+on:
+  push:
+    branches: [nightly]
+    paths: ["launcher/**", "tools/**", "src/**", ".github/workflows/nightly.yml"]
+  schedule:
+    # Daily at 02:00 UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Platforms to build: all, or any of linux windows macos"
+        default: all
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'linux')
+    runs-on: ubuntu-22.04
+    env:
+      WAYLAND_PROTOCOLS: "1.45"
+      WAYLAND_PROTOCOLS_SHA256: 4d2b2a9e3e099d017dc8107bf1c334d27bb87d9e4aff19a0c8d856d17cd41ef0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config glslang-tools git \
+            libvulkan-dev libfreetype-dev libfontconfig-dev libx11-dev libxcursor-dev libxrandr-dev libwayland-dev \
+            libxkbcommon-dev libdbus-1-dev mesa-vulkan-drivers vulkan-validationlayers fonts-dejavu-core
+
+      - name: wayland-protocols ${{ env.WAYLAND_PROTOCOLS }}
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -sSfL -o wp.tar.xz "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/releases/$WAYLAND_PROTOCOLS/downloads/wayland-protocols-$WAYLAND_PROTOCOLS.tar.xz"
+          echo "$WAYLAND_PROTOCOLS_SHA256  wp.tar.xz" | sha256sum -c -
+          tar xf wp.tar.xz
+          echo "VCS_WAYLAND_PROTOCOLS_DIR=$RUNNER_TEMP/wayland-protocols-$WAYLAND_PROTOCOLS" >> "$GITHUB_ENV"
+
+      - name: Build the launcher
+        run: python3 tools/build.py --launcher
+
+      - name: Self-test
+        run: |
+          ./VCSLauncher --self-test --out "$RUNNER_TEMP/selftest.txt"; code=$?
+          cat "$RUNNER_TEMP/selftest.txt"
+          exit $code
+
+      - name: Build Nightly AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: python3 tools/release.py --platform linux --version nightly --launcher VCSLauncher --worktree
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: |
+            build/dist/*.AppImage
+            build/dist/*.AppImage.sha256
+
+  windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'windows')
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/cache@v4
+        with:
+          path: build/build-tools
+          key: build-tools-windows-${{ hashFiles('tools/toolchain.py') }}
+
+      - name: Build the launcher
+        run: python tools/build.py --launcher
+
+      - name: Self-test
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'selftest.txt'
+          $p = Start-Process -FilePath .\VCSLauncher.exe -ArgumentList '--self-test','--out',$out -Wait -PassThru
+          Get-Content $out
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - name: Build Nightly Zip
+        run: python tools/release.py --version nightly --launcher VCSLauncher.exe --worktree
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: |
+            build/dist/*.zip
+            build/dist/*.zip.sha256
+
+  macos:
+    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'macos')
+    runs-on: macos-15
+    env:
+      VCS_SELFTEST_NO_GPU: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/cache@v4
+        with:
+          path: build/build-tools
+          key: build-tools-macos-${{ hashFiles('tools/toolchain.py', 'tools/shader_tools/CMakeLists.txt') }}
+
+      - name: Build the launcher
+        run: python3 tools/build.py --launcher
+
+      - name: Self-test
+        run: |
+          ./VCSLauncher.app/Contents/MacOS/VCSLauncher --self-test --out "$RUNNER_TEMP/selftest.txt"; code=$?
+          cat "$RUNNER_TEMP/selftest.txt"
+          exit $code
+
+      - name: Build Nightly DMG
+        run: python3 tools/release.py --platform macos --version nightly --launcher VCSLauncher.app --worktree
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: |
+            build/dist/*.dmg
+            build/dist/*.dmg.sha256
+
+  publish:
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish Nightly Pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          TITLE="Leonidas ViceCityStories (LVCS) - Nightly Build"
+          BODY="Automated nightly build from commit \`${GITHUB_SHA}\` (\`${GITHUB_REF_NAME}\`) on $(date -u '+%Y-%m-%d %H:%M:%S UTC')."
+          if gh release view nightly --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Updating existing nightly release"
+            gh release edit nightly --repo "${{ github.repository }}" --target "${GITHUB_SHA}" --title "$TITLE" --notes "$BODY" --prerelease
+            gh release upload nightly dist/* --repo "${{ github.repository }}" --clobber
+          else
+            echo "Creating new nightly release"
+            gh release create nightly dist/* --repo "${{ github.repository }}" --target "${GITHUB_SHA}" --title "$TITLE" --notes "$BODY" --prerelease
+          fi

@@ -1,40 +1,23 @@
 #!/usr/bin/env python3
-"""Update a release folder to the newest release on GitHub. Only when asked; nothing is sent but the request itself.
+"""Update a release folder or git clone to the newest version on GitHub.
 
-    python tools/update.py check               the newest release vs this one (RELEASE.json's version)
-    python tools/update.py apply [--zip FILE]  download the newest release's zip (or use FILE) and put it in place
-    python3 tools/update.py apply [--appimage FILE]   Linux: the newest AppImage (or FILE) in place of the running one
-    python3 tools/update.py install --from DIR --to FOLDER   Linux / macOS: an AppImage's (or VCSLauncher.app's)
-                                               release files into the folder the game is built in (the launcher runs it
-                                               at start when they differ)
-    python3 tools/update.py apply [--zip FILE]   macOS: the newest release's VCSLauncher.app in place of the running
-                                               one ($VCS_APP_BUNDLE, set by the launcher); FILE: its .dmg (or a zip)
+    python tools/update.py check [--channel stable|nightly|auto]
+    python tools/update.py apply [--channel stable|nightly|auto] [--zip FILE] [--appimage FILE]
+    python3 tools/update.py install --from DIR --to FOLDER
 
-apply replaces the release's files with the new release's, removes the files the old release had and the new one
-doesn't (RELEASE.json lists them), and keeps everything else: build/ (the built game, vcs.ini, the launcher's
-settings), generated/, your disc, anything you added. The game then needs building again (the launcher says so;
-it is incremental). A git clone isn't a release: update it with git pull.
-
-Linux releases are an AppImage (tools/release.py): a read-only image holding the launcher and the release's files.
-The game is built in a folder of its own ($XDG_DATA_HOME/VCSRecomp/install, VCS_INSTALL_DIR), which the launcher fills
-from the image with `install` - only files whose bytes changed are written, so a rebuild after an update stays
-incremental. `apply` there replaces the AppImage file itself ($APPIMAGE, set by the AppImage runtime); the next start
-of the launcher puts the new files in place.
-
-macOS releases are a disk image (.dmg, tools/dmg.py) holding VCSLauncher.app, whose Contents/Resources/release has the
-release's files; the game is built in ~/Library/Application Support/VCSRecomp/install, filled with `install` as from an
-AppImage. `apply` mounts the image out of Finder's sight, copies the app out with ditto (its signature and modes stay)
-and replaces the app bundle where it is (the old one moved aside first, then removed); the next start puts the new
-files in place. An app macOS runs from a quarantined download in place
-(App Translocation, a read-only copy) can't be replaced: it has to be moved to Applications first.
+apply replaces the release's files with the new release's, removes obsolete files listed in RELEASE.json,
+and preserves everything else: build/ (vcs.ini, launcher settings, build output), generated/, discs, and mods.
+For git clones, check compares local HEAD against origin, and apply pulls updates via git pull.
 """
 import argparse
+import datetime
 import filecmp
 import hashlib
 import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 import urllib.error
@@ -48,6 +31,7 @@ import toolchain as tc  # noqa: E402
 RELEASE_JSON = os.path.join(tc.ROOT, "RELEASE.json")
 UPDATE_DIR = os.path.join(tc.BUILD, "update")
 KEEP = ("build/", "generated/")  # never replaced or removed
+DEFAULT_REPO = "NuxsGit/LeonidasViceCity"
 ASSET_SUFFIX = "-windows.zip" if tc.IS_WINDOWS else "-macos-arm64.dmg" if tc.IS_MACOS else "-x86_64.AppImage"
 
 
@@ -63,50 +47,237 @@ def version_key(v):
     return [int(x) for x in re.findall(r"\d+", v)] or [0]
 
 
-def latest(repo):
-    req = urllib.request.Request("https://api.github.com/repos/%s/releases/latest" % repo,
-                                 headers={"Accept": "application/vnd.github+json", "User-Agent": "vcs-recomp-update"})
+def get_channel(requested=None, mine=None):
+    if requested and requested not in ("auto", "default"):
+        return requested.lower()
+    env = os.environ.get("VCS_UPDATE_CHANNEL")
+    if env and env.strip():
+        return env.strip().lower()
+    ini_ch = tc.ini_value(tc.GAME_INI, "channel") or tc.ini_value(tc.GAME_INI, "update_channel") or \
+             tc.ini_value(tc.ROOT_INI, "channel") or tc.ini_value(tc.ROOT_INI, "update_channel")
+    if ini_ch:
+        return ini_ch.strip().lower()
+    if mine:
+        v = (mine.get("version") or "").lower()
+        if "nightly" in v or "dev" in v:
+            return "nightly"
+    return "auto"
+
+
+def fetch_github_api(url):
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "LVCS-update"})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            data = json.load(r)
+            return json.load(r)
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            return None  # no release published yet
+            return None
         tc.fail("GitHub answered %d" % e.code, "network")
     except (OSError, ValueError) as e:
         tc.fail("could not reach GitHub: %s" % e, "network")
+    return None
+
+
+def find_asset(data):
     assets = {a["name"]: a["browser_download_url"] for a in data.get("assets", [])}
-    # this platform's: the Windows zip, the Linux AppImage, the macOS disk image
-    zips = [n for n in assets if n.endswith(ASSET_SUFFIX)]
-    return {"version": re.sub(r"^v", "", data.get("tag_name", "")), "url": data.get("html_url", ""),
-            "zip": assets[zips[0]] if zips else "", "sha256": assets.get(zips[0] + ".sha256", "") if zips else ""}
+    matched = []
+    if tc.IS_WINDOWS:
+        matched = [n for n in assets if n.endswith("-windows.zip")] or \
+                  [n for n in assets if n.endswith(".zip") and ("windows" in n.lower() or "win64" in n.lower())] or \
+                  [n for n in assets if n.endswith(".zip")]
+    elif tc.IS_MACOS:
+        matched = [n for n in assets if n.endswith("-macos-arm64.dmg")] or \
+                  [n for n in assets if n.endswith(".dmg")] or \
+                  [n for n in assets if n.endswith(".zip") and ("macos" in n.lower() or "darwin" in n.lower())]
+    else:  # Linux
+        matched = [n for n in assets if n.endswith("-x86_64.AppImage")] or \
+                  [n for n in assets if n.endswith(".AppImage")]
+    asset_name = matched[0] if matched else ""
+    asset_url = assets.get(asset_name, "")
+    sha256_url = assets.get(asset_name + ".sha256", "")
+    return asset_name, asset_url, sha256_url
 
 
-def check():
+def parse_release_data(data):
+    if not data:
+        return None
+    asset_name, asset_url, sha256_url = find_asset(data)
+    ver = re.sub(r"^v", "", data.get("tag_name", ""))
+    return {
+        "version": ver,
+        "tag_name": data.get("tag_name", ""),
+        "name": data.get("name", ""),
+        "url": data.get("html_url", ""),
+        "prerelease": data.get("prerelease", False),
+        "published_at": data.get("published_at", ""),
+        "target_commitish": data.get("target_commitish", ""),
+        "zip": asset_url,
+        "asset_name": asset_name,
+        "sha256": sha256_url,
+    }
+
+
+def latest(repo, channel="auto"):
+    repo = repo or DEFAULT_REPO
+    if channel == "nightly":
+        data = fetch_github_api("https://api.github.com/repos/%s/releases/tags/nightly" % repo)
+        if not data:
+            all_rel = fetch_github_api("https://api.github.com/repos/%s/releases" % repo) or []
+            nightly_rel = [r for r in all_rel if r.get("tag_name") == "nightly" or r.get("prerelease")]
+            if nightly_rel:
+                data = nightly_rel[0]
+        return parse_release_data(data)
+
+    if channel == "stable":
+        data = fetch_github_api("https://api.github.com/repos/%s/releases/latest" % repo)
+        if not data:
+            all_rel = fetch_github_api("https://api.github.com/repos/%s/releases" % repo) or []
+            stable_rel = [r for r in all_rel if not r.get("prerelease") and r.get("tag_name") != "nightly"]
+            if stable_rel:
+                data = stable_rel[0]
+        return parse_release_data(data)
+
+    # auto channel: prefer latest stable; if none exists, fall back to nightly
+    data = fetch_github_api("https://api.github.com/repos/%s/releases/latest" % repo)
+    if not data:
+        data = fetch_github_api("https://api.github.com/repos/%s/releases/tags/nightly" % repo)
+    if not data:
+        all_rel = fetch_github_api("https://api.github.com/repos/%s/releases" % repo) or []
+        if all_rel:
+            data = all_rel[0]
+    return parse_release_data(data)
+
+
+def is_newer(found, mine):
+    if not found or not found.get("version"):
+        return False
+    if not mine:
+        return True
+
+    found_ver = found.get("version", "")
+    mine_ver = mine.get("version", "")
+
+    f_key = version_key(found_ver)
+    m_key = version_key(mine_ver)
+    if f_key != [0] and m_key != [0]:
+        if f_key > m_key:
+            return True
+        if f_key < m_key:
+            return False
+
+    if "nightly" in found_ver.lower() or "nightly" in mine_ver.lower() or found.get("prerelease"):
+        mine_commit = (mine.get("commit") or "").strip()
+        found_commit = (found.get("target_commitish") or "").strip()
+        if mine_commit and found_commit and len(mine_commit) >= 7 and len(found_commit) >= 7:
+            if not found_commit.startswith(mine_commit[:7]) and not mine_commit.startswith(found_commit[:7]):
+                return True
+        mine_built = mine.get("built_at") or ""
+        found_pub = found.get("published_at") or ""
+        if mine_built and found_pub and found_pub > mine_built:
+            return True
+        if found_ver.lower() == "nightly" and mine_ver.lower() != "nightly":
+            return True
+
+    return False
+
+
+def check_git():
+    git_dir = os.path.join(tc.ROOT, ".git")
+    if not os.path.isdir(git_dir):
+        msg = "No RELEASE.json: not a release folder."
+        print("[update] " + msg)
+        tc.event(result="ok", newer=False, message=msg)
+        return
+    try:
+        branch = subprocess.run(["git", "-C", tc.ROOT, "rev-parse", "--abbrev-ref", "HEAD"],
+                                capture_output=True, text=True, check=True).stdout.strip()
+        head = subprocess.run(["git", "-C", tc.ROOT, "rev-parse", "HEAD"],
+                              capture_output=True, text=True, check=True).stdout.strip()
+        # Find upstream tracking branch or origin/<branch> or origin/main
+        target_ref = ""
+        u_res = subprocess.run(["git", "-C", tc.ROOT, "rev-parse", "--abbrev-ref", "@{u}"],
+                               capture_output=True, text=True)
+        if u_res.returncode == 0 and u_res.stdout.strip():
+            target_ref = u_res.stdout.strip()
+            subprocess.run(["git", "-C", tc.ROOT, "fetch", "--quiet"], capture_output=True)
+        else:
+            fetch = subprocess.run(["git", "-C", tc.ROOT, "fetch", "origin", branch, "--quiet"],
+                                   capture_output=True, text=True)
+            if fetch.returncode == 0:
+                target_ref = "origin/" + branch
+            else:
+                subprocess.run(["git", "-C", tc.ROOT, "fetch", "origin", "main", "--quiet"], capture_output=True)
+                target_ref = "origin/main"
+
+        if target_ref:
+            rem_res = subprocess.run(["git", "-C", tc.ROOT, "rev-parse", target_ref],
+                                     capture_output=True, text=True)
+            if rem_res.returncode == 0:
+                remote = rem_res.stdout.strip()
+                if head != remote:
+                    behind = subprocess.run(["git", "-C", tc.ROOT, "rev-list", "--count", "HEAD.." + target_ref],
+                                            capture_output=True, text=True)
+                    count = int(behind.stdout.strip()) if behind.returncode == 0 and behind.stdout.strip().isdigit() else 0
+                    if count > 0:
+                        msg = "Git update available: %d commit(s) behind %s (%s -> %s)." % (
+                            count, target_ref, head[:8], remote[:8])
+                        print("[update] " + msg)
+                        tc.event(result="ok", newer=True, current=head[:8], latest=remote[:8],
+                                 message=msg, is_git=True)
+                        return
+                msg = "You are up to date with %s (commit %s)." % (target_ref, head[:8])
+                print("[update] " + msg)
+                tc.event(result="ok", newer=False, current=head[:8], latest=head[:8],
+                         message=msg, is_git=True)
+                return
+    except (subprocess.CalledProcessError, OSError):
+        pass
+    msg = "This is a git clone: run 'git pull' to update, then rebuild with python tools/build.py"
+    print("[update] " + msg)
+    tc.event(result="ok", newer=False, message=msg, is_git=True)
+
+
+def apply_git():
+    tc.stage("apply", "Pulling latest changes from git")
+    try:
+        res = subprocess.run(["git", "-C", tc.ROOT, "pull", "--ff-only"],
+                             capture_output=True, text=True)
+        if res.returncode != 0:
+            res = subprocess.run(["git", "-C", tc.ROOT, "pull"],
+                                 capture_output=True, text=True)
+        if res.returncode != 0:
+            tc.fail("git pull failed:\n" + res.stderr, "git_error")
+        head = subprocess.run(["git", "-C", tc.ROOT, "rev-parse", "HEAD"],
+                              capture_output=True, text=True, check=True).stdout.strip()
+        print("[update] git pull succeeded (commit %s). Build the game again (the launcher, or python tools/build.py)."
+              % head[:8])
+        tc.event(result="ok", version=head[:8], restart=True)
+    except (subprocess.CalledProcessError, OSError) as e:
+        tc.fail("git update failed: %s" % e, "git_error")
+
+
+def check(channel="auto"):
     mine = this_release()
     if not mine:
-        message = ("This is a git clone, not a release: update it with git pull, then build again."
-                   if os.path.exists(os.path.join(tc.ROOT, ".git")) else "No RELEASE.json: not a release folder.")
-        print("[update] " + message)
-        tc.event(result="ok", newer=False, message=message)
+        check_git()
         return
-    repo = mine.get("repository") or ""
-    if not repo:
-        tc.fail("RELEASE.json names no repository", "error")
-    found = latest(repo)
+    repo = mine.get("repository") or DEFAULT_REPO
+    active_channel = get_channel(channel, mine)
+    found = latest(repo, active_channel)
     if not found or not found["version"]:
-        message = "No release published yet on github.com/%s." % repo
+        message = "No release published yet on github.com/%s (channel: %s)." % (repo, active_channel)
         print("[update] " + message)
         tc.event(result="ok", newer=False, message=message)
         return
-    newer = version_key(found["version"]) > version_key(mine["version"])
-    print("[update] this: %s, newest: %s%s" % (mine["version"], found["version"], " - an update is available" if newer else ""))
+    newer = is_newer(found, mine)
+    print("[update] this: %s, newest: %s (%s)%s" % (
+        mine["version"], found["version"], active_channel, " - an update is available" if newer else ""))
     tc.event(result="ok", newer=newer, current=mine["version"], latest=found["version"], url=found["url"],
-             zip=found["zip"], message="" if newer else "You have the latest release (%s)." % mine["version"])
+             zip=found["zip"], channel=active_channel,
+             message="" if newer else "You have the latest %s release (%s)." % (active_channel, mine["version"]))
 
 
 def set_aside(path):
-    """A file in use (a running exe or DLL can be renamed, not replaced): moved to <name>.old, removed next time."""
     old = path + ".old"
     if os.path.exists(old):
         os.remove(old)
@@ -114,9 +285,6 @@ def set_aside(path):
 
 
 def put(z, name, target):
-    """One file of the release zip written to `target`. A file held open is tried again for a few seconds (an
-    antivirus scanning it lets go), then renamed aside (running: the launcher, this Python - a running exe or DLL can
-    be renamed, not replaced) and written fresh."""
     os.makedirs(os.path.dirname(target), exist_ok=True)
     for attempt in range(5):
         try:
@@ -136,7 +304,6 @@ def put(z, name, target):
 
 
 def remove_set_aside():
-    """The .old files a previous update couldn't remove (they were running then)."""
     for d in (tc.ROOT, os.path.join(tc.ROOT, "python")):
         if os.path.isdir(d):
             for f in os.listdir(d):
@@ -165,7 +332,7 @@ def download(url, out):
 
 def verified_download(found, out):
     download(found["zip"], out)
-    if found["sha256"]:
+    if found.get("sha256"):
         with urllib.request.urlopen(found["sha256"], timeout=30) as r:
             want = r.read().decode().split()[0].lower()
         got = hashlib.sha256(open(out, "rb").read()).hexdigest()
@@ -174,21 +341,20 @@ def verified_download(found, out):
             tc.fail("the download's checksum doesn't match: try again", "network")
 
 
-def apply_appimage(mine, appimage_path=None):
-    """Linux: the new AppImage in place of the running one (renamed over it: the running image stays mounted until the
-    launcher ends). Its files go into the install folder when the launcher next starts (install below)."""
+def apply_appimage(mine, appimage_path=None, channel="auto"):
     target = os.environ.get("APPIMAGE", "")
     if not target or not os.path.isfile(target):
         tc.fail("not started from an AppImage ($APPIMAGE isn't set): a git clone updates with git pull", "git_checkout")
     new = target + ".new"
     if appimage_path:
         shutil.copyfile(appimage_path, new)
-        version = "the new release (%s)" % os.path.basename(appimage_path)  # its number: when it starts
+        version = "the new release (%s)" % os.path.basename(appimage_path)
     else:
-        found = latest(mine.get("repository", ""))
+        active_channel = get_channel(channel, mine)
+        found = latest(mine.get("repository", DEFAULT_REPO), active_channel)
         if not found or not found["zip"]:
             tc.fail("no AppImage found in the newest release on GitHub", "network")
-        if version_key(found["version"]) <= version_key(mine["version"]):
+        if not is_newer(found, mine):
             print("[update] already the newest (%s)" % mine["version"])
             tc.event(result="ok", version=mine["version"])
             return
@@ -197,33 +363,27 @@ def apply_appimage(mine, appimage_path=None):
     tc.stage("apply", "Putting the new release in place")
     with open(new, "rb") as f:
         head = f.read(16)
-    if head[:4] != b"\x7fELF" or head[8:11] != b"AI\x02":  # an ELF with the AppImage type 2 magic
+    if head[:4] != b"\x7fELF" or head[8:11] != b"AI\x02":
         os.remove(new)
         tc.fail("not an AppImage: " + (appimage_path or new), "error")
     os.chmod(new, 0o755)
     os.replace(new, target)
     print("[update] %s -> %s: %s. Start the launcher again; it puts the new files in place, then build the game again."
           % (mine["version"], version, target))
-    tc.event(result="ok", version=version, restart=True)  # the launcher offers Restart (the new AppImage)
+    tc.event(result="ok", version=version, restart=True)
 
 
-def apply_app(mine, zip_path=None):
-    """macOS: the new release's VCSLauncher.app in place of the running one ($VCS_APP_BUNDLE). Its files go into the
-    install folder when the launcher next starts (install below)."""
-    import subprocess
+def apply_app(mine, zip_path=None, channel="auto"):
     bundle = os.environ.get("VCS_APP_BUNDLE", "")
-    if not bundle or not os.path.isdir(os.path.join(bundle, "Contents")):
-        tc.fail("not started from VCSLauncher.app ($VCS_APP_BUNDLE isn't set): a git clone updates with git pull",
-                "git_checkout")
-    if "/AppTranslocation/" in bundle:
-        tc.fail("macOS runs the launcher from a read-only copy of the download: move VCSLauncher.app to Applications "
-                "(drag it there in Finder), start it from there, then update again", "app_translocated")
-    version = None
+    if not bundle or not os.path.isdir(bundle):
+        tc.fail("VCS_APP_BUNDLE isn't set (the launcher sets it): start the update from the launcher", "error")
+    version = ""
     if not zip_path:
-        found = latest(mine.get("repository", ""))
+        active_channel = get_channel(channel, mine)
+        found = latest(mine.get("repository", DEFAULT_REPO), active_channel)
         if not found or not found["zip"]:
-            tc.fail("no macOS release found on GitHub", "network")
-        if version_key(found["version"]) <= version_key(mine["version"]):
+            tc.fail("no release disk image found on GitHub", "network")
+        if not is_newer(found, mine):
             print("[update] already the newest (%s)" % mine["version"])
             tc.event(result="ok", version=mine["version"])
             return
@@ -236,10 +396,10 @@ def apply_app(mine, zip_path=None):
     os.makedirs(unpacked)
     with open(zip_path, "rb") as f:
         is_zip = f.read(4) == b"PK\x03\x04"
-    if is_zip:  # a zip of the app given by hand (--zip): releases are disk images, a zip still works
+    if is_zip:
         if subprocess.run(["/usr/bin/ditto", "-x", "-k", zip_path, unpacked]).returncode != 0:
             tc.fail("could not unzip " + zip_path, "error")
-    else:  # the release's disk image: mounted out of sight, the app copied out with ditto (modes, signature)
+    else:
         try:
             with dmg.attached(zip_path) as mount:
                 app = dmg.find_app(mount)
@@ -257,7 +417,7 @@ def apply_app(mine, zip_path=None):
     old = bundle.rstrip("/") + ".old"
     shutil.rmtree(old, ignore_errors=True)
     try:
-        os.rename(bundle, old)  # the running launcher keeps its open files
+        os.rename(bundle, old)
         shutil.move(new, bundle)
     except OSError as e:
         if os.path.isdir(old) and not os.path.isdir(bundle):
@@ -272,9 +432,6 @@ def apply_app(mine, zip_path=None):
 
 
 def install(source, target):
-    """An AppImage's release files (source: its usr/share/vcs-recomp/release) into the install folder: the files whose
-    bytes differ written, the ones the previous release had and this one doesn't removed (RELEASE.json lists them),
-    build/ and generated/ left alone. RELEASE.json last, so an interrupted install is redone."""
     new = None
     try:
         with open(os.path.join(source, "RELEASE.json"), encoding="utf-8") as f:
@@ -296,11 +453,11 @@ def install(source, target):
         if not os.path.abspath(dst).startswith(os.path.abspath(target) + os.sep) or not os.path.isfile(src):
             continue
         if os.path.isfile(dst) and os.path.getsize(dst) == os.path.getsize(src) and filecmp.cmp(src, dst, shallow=False):
-            continue  # the same bytes: its date stays, and nothing rebuilds for it
+            continue
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         tmp = dst + ".new"
         shutil.copyfile(src, tmp)
-        shutil.copymode(src, tmp)  # the scripts' executable bits
+        shutil.copymode(src, tmp)
         os.replace(tmp, dst)
         written += 1
         if i % 200 == 0:
@@ -320,28 +477,32 @@ def install(source, target):
     tc.event(result="ok", version=new.get("version", ""), written=written, removed=removed)
 
 
-def apply(zip_path=None, appimage_path=None):
+def apply(zip_path=None, appimage_path=None, channel="auto"):
     mine = this_release()
     if not mine:
+        if os.path.isdir(os.path.join(tc.ROOT, ".git")):
+            apply_git()
+            return
         tc.fail("not a release folder (no RELEASE.json): a git clone updates with git pull", "git_checkout")
     if tc.IS_MACOS:
-        apply_app(mine, zip_path)
+        apply_app(mine, zip_path, channel)
         return
     if not tc.IS_WINDOWS:
-        apply_appimage(mine, appimage_path)
+        apply_appimage(mine, appimage_path, channel)
         return
     if not zip_path:
-        found = latest(mine.get("repository", ""))
+        active_channel = get_channel(channel, mine)
+        found = latest(mine.get("repository", DEFAULT_REPO), active_channel)
         if not found or not found["zip"]:
             tc.fail("no release zip found on GitHub", "network")
-        if version_key(found["version"]) <= version_key(mine["version"]):
+        if not is_newer(found, mine):
             print("[update] already the newest (%s)" % mine["version"])
             tc.event(result="ok", version=mine["version"])
             return
         zip_path = os.path.join(UPDATE_DIR, found["zip"].rsplit("/", 1)[1])
         verified_download(found, zip_path)
     tc.stage("apply", "Putting the new release in place")
-    failed = []  # (relative path, error): files that could not be written - the rest still goes in
+    failed = []
     with zipfile.ZipFile(zip_path) as z:
         top = {n.split("/", 1)[0] for n in z.namelist()}
         if len(top) != 1:
@@ -349,9 +510,6 @@ def apply(zip_path=None, appimage_path=None):
         prefix = top.pop() + "/"
         new = json.loads(z.read(prefix + "RELEASE.json"))
         names = [n for n in z.namelist() if not n.endswith("/")]
-        # VERSION and RELEASE.json last, and only when every other file is in: an update that stopped halfway once
-        # left a folder saying 0.2.1 with half of 0.1.1's tools (issue 66). With RELEASE.json still the old one, the
-        # launcher offers the update again and a second run writes what the first could not.
         last = [prefix + "VERSION", prefix + "RELEASE.json"]
         for i, n in enumerate([n for n in names if n not in last] + [n for n in last if n in names]):
             rel = n[len(prefix):]
@@ -388,18 +546,22 @@ def apply(zip_path=None, appimage_path=None):
             except PermissionError:
                 try:
                     set_aside(path)
-                except OSError as e:  # an old file left behind is harmless: the new release doesn't use it
+                except OSError as e:
                     print("[update] could not remove %s: %s" % (rel, e))
     print("[update] %s -> %s (%d files, %d removed). Build the game again (the launcher, or python tools/build.py "
           "--recompile-if-needed)." % (mine["version"], new["version"], len(names), len(gone)))
-    tc.event(result="ok", version=new["version"], restart=True)  # the launcher offers Restart (its new exe)
+    tc.event(result="ok", version=new["version"], restart=True)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("check")
+    p = sub.add_parser("check")
+    p.add_argument("--channel", choices=("stable", "nightly", "auto"), default="auto",
+                   help="release channel to check (stable, nightly, or auto)")
     p = sub.add_parser("apply")
+    p.add_argument("--channel", choices=("stable", "nightly", "auto"), default="auto",
+                   help="release channel to apply from (stable, nightly, or auto)")
     p.add_argument("--zip", help="a release zip (macOS: its .dmg) to apply instead of downloading the newest")
     p.add_argument("--appimage", help="Linux: an AppImage to put in place instead of downloading the newest")
     p = sub.add_parser("install")
@@ -411,9 +573,9 @@ def main():
         return
     remove_set_aside()
     if a.cmd == "check":
-        check()
+        check(a.channel)
     else:
-        apply(a.zip, a.appimage)
+        apply(a.zip, a.appimage, a.channel)
 
 
 if __name__ == "__main__":
