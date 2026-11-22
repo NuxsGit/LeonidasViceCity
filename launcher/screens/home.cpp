@@ -215,7 +215,7 @@ namespace screens
             const float horizon = std::round(r.h * 0.70f);
             const float mw = std::clamp(std::min(r.w, r.h) * 0.58f, px(320.0f), px(560.0f));
             const float mh = mw * (262.0f / 480.0f);
-            const float mcx = r.w * 0.72f;
+            const float mcx = r.w * 0.73f;
             const Rect mascotArea{mcx - mw * 0.5f, horizon - mh + px(10.0f), mw, mh};
             ui::tooltip(ui::id("MaccaTeams"), mascotArea, "Macca the Alligator & the Leonidas Vice City Crew");
         }
