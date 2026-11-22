@@ -22,7 +22,7 @@ namespace present
         {
             float rect[4];  // NDC left, top, right, bottom
             float uvMax[2];
-            float postFx[2]; // LeonidasViceCity: [0] = mode (0/1), [1] = intensity
+            float postFx[2]; // Leonidas ViceCityStories (LVCS): [0] = mode (0/1), [1] = intensity
         };
 
         std::unique_ptr<rhi::Device> g_device;

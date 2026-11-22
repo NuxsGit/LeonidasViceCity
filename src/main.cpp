@@ -84,10 +84,10 @@ namespace
     using vcs::disc::kElfName;
     using vcs::disc::kElfSha1;
 
-    class LeonidasModDisc final : public IPS2DiscImage
+    class LvcsModDisc final : public IPS2DiscImage
     {
     public:
-        LeonidasModDisc(const vcs::IsoImage &iso, vcs::mods::ModManager &mods)
+        LvcsModDisc(const vcs::IsoImage &iso, vcs::mods::ModManager &mods)
             : m_iso(iso), m_mods(mods) {}
 
         bool findFile(std::string_view ps2Path, uint32_t &lsn, uint32_t &sizeBytes, bool &isDirectory) const override
@@ -366,7 +366,7 @@ namespace
     // Balanced (until 2026-11-14 "Widescreen, light" at 1x; the user asked for the name and 2x).
     const Preset kBalanced[] = {{"display.aspect", 0}, {"display.hud", 2},    {"display.scale", 2},  {"display.msaa", 1},
                                 {"display.aniso", 4},  {"display.timing", 1}, {"display.fps", 60}, {"display.vsync", kVsyncDefault}};
-    // Leonidas HD Remake (Next-Gen Vice City Experience)
+    // LVCS HD Remake (Next-Gen Vice City Stories Experience)
     const Preset kHdRemake[] = {{"display.aspect", 0}, {"display.hud", 2},    {"display.scale", 4},  {"display.msaa", 4},
                                 {"display.aniso", 16}, {"display.timing", 1}, {"display.fps", 60}, {"display.vsync", kVsyncDefault},
                                 {"enhance.traffic", 250}, {"enhance.peds", 250}, {"enhance.draw_distance", 300}};
@@ -464,13 +464,13 @@ namespace
         s.key = "presets.hd_remake";
         s.page = "Display";
         s.section = "Presets";
-        s.label = "Leonidas HD Remake";
-        s.help = "Vice City Next-Gen: 16:9 widescreen, 4x resolution, 8x MSAA, 16x Aniso, 60 fps smooth physics, "
+        s.label = "LVCS HD Remake";
+        s.help = "Vice City Stories Next-Gen: 16:9 widescreen, 4x resolution, 8x MSAA, 16x Aniso, 60 fps smooth physics, "
                  "250% traffic and pedestrian density, 300% draw distance, and 80s Neon Wave Shaders.";
         s.type = Type::Action;
         s.button = "Apply";
         s.onChange = [](int) {
-            applyPreset("Leonidas HD Remake", kHdRemake);
+            applyPreset("LVCS HD Remake", kHdRemake);
             vcs::mods::ModManager::instance().applyHdRemakePreset(true);
             setEnv("LEONIDAS_POSTFX", "1");
         };
@@ -779,12 +779,12 @@ namespace
         vcs::driveby::registerSettings(); // Enhancements > Combat: drive-by fire rate (game/vcs_driveby.h)
         vcs::registerEffectsSettings();   // Enhancements > Effects: Reduce Post Processing Effects (game/vcs_effects_timing.h)
 
-        // LeonidasViceCity - Mods & HD Remake Page
+        // Leonidas ViceCityStories (LVCS) - Mods & HD Remake Page
         s = {};
         s.key = "mods.hd_remake";
         s.page = "Mods & Remake";
-        s.section = "Leonidas Remake Engine";
-        s.label = "Leonidas HD Remake Mode";
+        s.section = "LVCS Remake Engine";
+        s.label = "LVCS HD Remake Mode";
         s.help = "Toggles the overall HD Remake experience: active mod virtual filesystem, enhanced visuals, and atmosphere.";
         s.type = Type::Toggle;
         s.defaultValue = 1;
@@ -794,7 +794,7 @@ namespace
         s = {};
         s.key = "mods.postfx_remake";
         s.page = "Mods & Remake";
-        s.section = "Leonidas Remake Engine";
+        s.section = "LVCS Remake Engine";
         s.label = "80s Neon Wave Shaders";
         s.help = "Modern Vice City post-processing shaders: ACES filmic tonemapping, neon bloom, and sunset color grading.";
         s.type = Type::Toggle;
@@ -974,11 +974,11 @@ int main(int argc, char *argv[])
             return code;
         }
 
-        // Initialize LeonidasViceCity Mod Manager and HD Textures
+        // Initialize Leonidas ViceCityStories (LVCS) Mod Manager and HD Textures
         vcs::mods::ModManager::instance().initialize(exeDirectory() / "mods");
         vcs::mods::HdTextureManager::instance().initialize(vcs::mods::ModManager::instance().modsPath());
 
-        LeonidasModDisc disc(iso, vcs::mods::ModManager::instance());
+        LvcsModDisc disc(iso, vcs::mods::ModManager::instance());
         ps2_disc::setImage(&disc);
 
         // the trainer's mission list names each mission from MAIN.SCM (game/vcs_trainer.h)

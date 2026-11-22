@@ -1,4 +1,4 @@
-// LeonidasViceCity - High Definition Texture Replacement System
+// Leonidas ViceCityStories (LVCS) - High Definition Texture Replacement System
 #pragma once
 
 #include <cstddef>

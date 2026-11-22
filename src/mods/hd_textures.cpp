@@ -1,4 +1,4 @@
-// LeonidasViceCity - High Definition Texture Replacement System Implementation
+// Leonidas ViceCityStories (LVCS) - High Definition Texture Replacement System Implementation
 #include "mods/hd_textures.h"
 
 #include <algorithm>
@@ -75,7 +75,7 @@ namespace vcs::mods
         if (std::filesystem::exists(globalTex, ec))
             scanTexturesInDir(globalTex);
 
-        std::cout << "[LeonidasHD] Indexed " << textureCount() << " replacement HD textures." << std::endl;
+        std::cout << "[LVCS-HD] Indexed " << textureCount() << " replacement HD textures." << std::endl;
     }
 
     void HdTextureManager::scanTexturesInDir(const std::filesystem::path &dir)

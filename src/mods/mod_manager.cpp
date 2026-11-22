@@ -1,4 +1,4 @@
-// LeonidasViceCity - Modding Engine Implementation
+// Leonidas ViceCityStories (LVCS) - Modding Engine Implementation
 #include "mods/mod_manager.h"
 
 #include <algorithm>
@@ -153,7 +153,7 @@ namespace vcs::mods
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_modsDirectory = discoverModsFolder(customModsPath);
-        std::cout << "[LeonidasMods] Mod manager initialized with directory: " << m_modsDirectory << std::endl;
+        std::cout << "[LVCS-Mods] Mod manager initialized with directory: " << m_modsDirectory << std::endl;
         refresh();
     }
 
@@ -174,7 +174,7 @@ namespace vcs::mods
         });
 
         rebuildVfsIndex();
-        std::cout << "[LeonidasMods] Discovered " << m_mods.size() << " mods ("
+        std::cout << "[LVCS-Mods] Discovered " << m_mods.size() << " mods ("
                   << m_vfsFiles.size() << " virtual files indexed)" << std::endl;
     }
 

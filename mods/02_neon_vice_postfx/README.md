@@ -1,6 +1,6 @@
 # 80s Neon Wave Shaders & PostFX
 
-Custom presentation shader extension for **LeonidasViceCity**.
+Custom presentation shader extension for **Leonidas ViceCityStories (LVCS)**.
 
 ### Features:
 - **Neon Bloom**: Illuminates street lights, vehicle headlights, and Vice City neon signs with an authentic retro glow.

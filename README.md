@@ -1,14 +1,14 @@
-# LeonidasViceCity — GTA: Vice City Stories Native Recompiler & HD Remake Engine
+# Leonidas ViceCityStories (LVCS) — GTA: Vice City Stories Native Recompiler & HD Remake Engine
 
 <p align="center">
-  <img src="launcher/launcher.png" alt="LeonidasViceCity Logo" width="220" />
+  <img src="launcher/launcher.png" alt="Leonidas ViceCityStories (LVCS) Logo" width="220" />
 </p>
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-brightgreen.svg)]()
 [![Graphics](https://img.shields.io/badge/Renderer-Direct3D%2011%20%7C%20Vulkan%20%7C%20Metal-orange.svg)]()
 
-**LeonidasViceCity** est un portage natif sur PC (Windows, Linux et macOS) de **Grand Theft Auto: Vice City Stories** (PS2, USA, SLUS-21590), utilisant la recompilation statique d'exécutable PS2 vers C++ natif, équipé d'un **moteur de mods complet (VFS)** et d'un **preset HD Remake intégré par défaut**.
+**Leonidas ViceCityStories (LVCS)** est un portage natif sur PC (Windows, Linux et macOS) de **Grand Theft Auto: Vice City Stories** (PS2, USA, SLUS-21590), utilisant la recompilation statique d'exécutable PS2 vers C++ natif, équipé d'un **moteur de mods complet (VFS)** et d'un **preset HD Remake intégré par défaut**.
 
 Ce projet permet de redécouvrir Vice City Stories avec des graphismes modernes en haute définition (résolution interne 4K, 60+ FPS débloqué, shaders néon rétro-futuristes des années 80, distance d'affichage x3, trafic dense) et d'installer ou créer des mods par simple glisser-déposer.
 
@@ -62,7 +62,7 @@ Ce projet permet de redécouvrir Vice City Stories avec des graphismes modernes 
    - **Disc** : glissez-déposez votre fichier `.iso`.
    - **Build tools** : vérification et installation automatique des compilateurs (clang/llvm-mingw).
    - **Build** : recompilation et optimisation du jeu.
-3. Cliquez sur l'onglet **Mods** dans la barre de titre pour activer/désactiver les mods ou appliquer le preset **Leonidas HD Remake**.
+3. Cliquez sur l'onglet **Mods** dans la barre de titre pour activer/désactiver les mods ou appliquer le preset **LVCS HD Remake**.
 4. Cliquez sur **Play** !
 
 ### Option 2 : En Ligne de Commande (Ligne de commande)
@@ -140,7 +140,7 @@ Pour ajouter un mod, créez un nouveau sous-dossier dans le répertoire `mods/` 
    - Scripts de missions : `MAIN.SCM`
    - Textures HD : placez vos images PNG dans un dossier `textures/` (ex: `mods/mon_super_mod/textures/radardisc.png`)
 
-Le moteur Virtual File System (VFS) de Leonidas prend automatiquement le relais lors du lancement !
+Le moteur Virtual File System (VFS) de Leonidas ViceCityStories (LVCS) prend automatiquement le relais lors du lancement !
 
 ---
 
