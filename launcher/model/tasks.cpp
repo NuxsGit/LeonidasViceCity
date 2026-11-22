@@ -603,8 +603,13 @@ namespace launcher
             say("Saves backed up: " + t.result["path"].str());
         if (t.kind == "restore" && t.ok())
             say("Saves restored (the card before it was backed up too)");
-        if (t.kind == "update_check" && t.ok() && !updateQuiet && !t.result["newer"].boolean())
-            say(t.result["message"].str().empty() ? "You have the latest release." : t.result["message"].str());
+        if (t.kind == "update_check" && t.ok() && !updateQuiet)
+        {
+            if (t.result["newer"].boolean())
+                say("An update is available: version " + t.result["latest"].str());
+            else
+                say(t.result["message"].str().empty() ? "You have the latest release." : t.result["message"].str());
+        }
         // a quiet check that found nothing new, or failed, leaves no trace
         if (t.kind == "update_check" && updateQuiet && (!t.ok() || !t.result["newer"].boolean()))
             task.reset();
