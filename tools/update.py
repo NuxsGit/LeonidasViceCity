@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -64,19 +65,77 @@ def get_channel(requested=None, mine=None):
     return "auto"
 
 
-def fetch_github_api(url):
-    req = urllib.request.Request(url, headers={
+def get_github_token():
+    """Look for a GitHub Personal Access Token or OAuth token for API requests."""
+    for var in ("GH_TOKEN", "GITHUB_TOKEN", "VCS_GITHUB_TOKEN"):
+        val = os.environ.get(var)
+        if val and val.strip():
+            return val.strip()
+    ini_tok = tc.ini_value(tc.GAME_INI, "github_token") or tc.ini_value(tc.GAME_INI, "token") or \
+              tc.ini_value(tc.ROOT_INI, "github_token") or tc.ini_value(tc.ROOT_INI, "token")
+    if ini_tok and ini_tok.strip():
+        return ini_tok.strip()
+    try:
+        res = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=5)
+        if res.returncode == 0 and res.stdout.strip():
+            return res.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        res = subprocess.run(["git", "config", "--get", "github.token"], capture_output=True, text=True, timeout=5)
+        if res.returncode == 0 and res.stdout.strip():
+            return res.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        proc = subprocess.run(["git", "credential", "fill"],
+                              input="protocol=https\nhost=github.com\n",
+                              capture_output=True, text=True, timeout=5)
+        if proc.returncode == 0:
+            for line in proc.stdout.splitlines():
+                if line.startswith("password="):
+                    pwd = line.split("=", 1)[1].strip()
+                    if pwd:
+                        return pwd
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+class AuthRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Strip Authorization header when redirected to Amazon S3 / Azure / release-assets."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new_req = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new_req:
+            orig_host = urllib.parse.urlparse(req.full_url).netloc
+            new_host = urllib.parse.urlparse(newurl).netloc
+            if orig_host != new_host:
+                new_req.headers = {k: v for k, v in new_req.headers.items() if k.lower() != "authorization"}
+        return new_req
+
+
+def fetch_github_api(url, token=None):
+    if token is None:
+        token = get_github_token()
+    headers = {
         "Accept": "application/vnd.github+json",
         "User-Agent": "LVCS-update",
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
-    })
+    }
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return None
+        if e.code == 403:
+            msg = "GitHub API rate limit exceeded (60 req/hr). Set GH_TOKEN or github_token in vcs.ini."
+            print("[update] " + msg)
+            tc.fail(msg, "network")
         tc.fail("GitHub answered %d" % e.code, "network")
     except (OSError, ValueError) as e:
         tc.fail("could not reach GitHub: %s" % e, "network")
@@ -84,29 +143,35 @@ def fetch_github_api(url):
 
 
 def find_asset(data):
-    assets = {a["name"]: a["browser_download_url"] for a in data.get("assets", [])}
+    if not data or not isinstance(data, dict):
+        return "", "", "", "", ""
+    assets = {a["name"]: a for a in data.get("assets", []) if isinstance(a, dict) and "name" in a}
     matched = []
     if tc.IS_WINDOWS:
         matched = [n for n in assets if n.endswith("-windows.zip")] or \
-                  [n for n in assets if n.endswith(".zip") and ("windows" in n.lower() or "win64" in n.lower())] or \
+                  [n for n in assets if n.endswith(".zip") and any(k in n.lower() for k in ("windows", "win64", "win32", "win"))] or \
                   [n for n in assets if n.endswith(".zip")]
     elif tc.IS_MACOS:
         matched = [n for n in assets if n.endswith("-macos-arm64.dmg")] or \
                   [n for n in assets if n.endswith(".dmg")] or \
-                  [n for n in assets if n.endswith(".zip") and ("macos" in n.lower() or "darwin" in n.lower())]
+                  [n for n in assets if n.endswith(".zip") and any(k in n.lower() for k in ("macos", "darwin"))]
     else:  # Linux
         matched = [n for n in assets if n.endswith("-x86_64.AppImage")] or \
                   [n for n in assets if n.endswith(".AppImage")]
     asset_name = matched[0] if matched else ""
-    asset_url = assets.get(asset_name, "")
-    sha256_url = assets.get(asset_name + ".sha256", "")
-    return asset_name, asset_url, sha256_url
+    asset_info = assets.get(asset_name, {})
+    asset_url = asset_info.get("browser_download_url", "")
+    asset_api_url = asset_info.get("url", "")
+    sha256_info = assets.get(asset_name + ".sha256", {})
+    sha256_url = sha256_info.get("browser_download_url", "")
+    sha256_api_url = sha256_info.get("url", "")
+    return asset_name, asset_url, asset_api_url, sha256_url, sha256_api_url
 
 
 def parse_release_data(data):
-    if not data:
+    if not data or not isinstance(data, dict):
         return None
-    asset_name, asset_url, sha256_url = find_asset(data)
+    asset_name, asset_url, asset_api_url, sha256_url, sha256_api_url = find_asset(data)
     ver = re.sub(r"^v", "", data.get("tag_name", ""))
     return {
         "version": ver,
@@ -117,14 +182,30 @@ def parse_release_data(data):
         "published_at": data.get("published_at", ""),
         "target_commitish": data.get("target_commitish", ""),
         "zip": asset_url,
+        "zip_api": asset_api_url,
         "asset_name": asset_name,
         "sha256": sha256_url,
+        "sha256_api": sha256_api_url,
     }
 
 
 def latest(repo, channel="auto"):
     repo = repo or DEFAULT_REPO
-    all_rel = fetch_github_api("https://api.github.com/repos/%s/releases" % repo) or []
+    token = get_github_token()
+    all_rel = fetch_github_api("https://api.github.com/repos/%s/releases" % repo, token=token)
+
+    if all_rel is None:
+        repo_data = fetch_github_api("https://api.github.com/repos/%s" % repo, token=token)
+        if repo_data is None:
+            if not token:
+                msg = ("Cannot access github.com/%s (404 Not Found). "
+                       "If this repository is private, set GH_TOKEN or github_token in vcs.ini, "
+                       "or authenticate with 'gh auth login'." % repo)
+            else:
+                msg = ("Cannot access github.com/%s (404 Not Found with provided token). "
+                       "Check repository permissions or token validity." % repo)
+            return {"error": msg, "version": ""}
+        all_rel = []
 
     if channel == "nightly":
         for r in all_rel:
@@ -132,7 +213,7 @@ def latest(repo, channel="auto"):
                 parsed = parse_release_data(r)
                 if parsed and parsed.get("zip"):
                     return parsed
-        data = fetch_github_api("https://api.github.com/repos/%s/releases/tags/nightly" % repo)
+        data = fetch_github_api("https://api.github.com/repos/%s/releases/tags/nightly" % repo, token=token)
         return parse_release_data(data)
 
     if channel == "stable":
@@ -141,7 +222,7 @@ def latest(repo, channel="auto"):
                 parsed = parse_release_data(r)
                 if parsed and parsed.get("zip"):
                     return parsed
-        data = fetch_github_api("https://api.github.com/repos/%s/releases/latest" % repo)
+        data = fetch_github_api("https://api.github.com/repos/%s/releases/latest" % repo, token=token)
         return parse_release_data(data)
 
     # auto channel: prefer newest stable with valid platform asset
@@ -157,9 +238,9 @@ def latest(repo, channel="auto"):
         if parsed and parsed.get("zip"):
             return parsed
 
-    data = fetch_github_api("https://api.github.com/repos/%s/releases/latest" % repo)
+    data = fetch_github_api("https://api.github.com/repos/%s/releases/latest" % repo, token=token)
     if not data:
-        data = fetch_github_api("https://api.github.com/repos/%s/releases/tags/nightly" % repo)
+        data = fetch_github_api("https://api.github.com/repos/%s/releases/tags/nightly" % repo, token=token)
     return parse_release_data(data)
 
 
@@ -279,8 +360,11 @@ def check(channel="auto"):
     repo = mine.get("repository") or DEFAULT_REPO
     active_channel = get_channel(channel, mine)
     found = latest(repo, active_channel)
-    if not found or not found["version"]:
-        message = "No release published yet on github.com/%s (channel: %s)." % (repo, active_channel)
+    if not found or not found.get("version"):
+        if found and found.get("error"):
+            message = found["error"]
+        else:
+            message = "No release published yet on github.com/%s (channel: %s)." % (repo, active_channel)
         print("[update] " + message)
         tc.event(result="ok", newer=False, message=message)
         return
@@ -329,10 +413,21 @@ def remove_set_aside():
                         pass
 
 
-def download(url, out):
+def download_stream(url, out, token=None, is_asset_api=False):
     tc.stage("download", "Downloading the new release")
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    with urllib.request.urlopen(url, timeout=60) as r, open(out + ".part", "wb") as f:
+    opener = urllib.request.build_opener(AuthRedirectHandler())
+
+    headers = {
+        "User-Agent": "LVCS-update",
+    }
+    if is_asset_api:
+        headers["Accept"] = "application/octet-stream"
+    if token:
+        headers["Authorization"] = "Bearer " + token
+
+    req = urllib.request.Request(url, headers=headers)
+    with opener.open(req, timeout=60) as r, open(out + ".part", "wb") as f:
         total = int(r.headers.get("Content-Length") or 0)
         done = 0
         while True:
@@ -345,15 +440,40 @@ def download(url, out):
     os.replace(out + ".part", out)
 
 
+def download(url, out):
+    download_stream(url, out)
+
+
 def verified_download(found, out):
-    download(found["zip"], out)
-    if found.get("sha256"):
-        with urllib.request.urlopen(found["sha256"], timeout=30) as r:
-            want = r.read().decode().split()[0].lower()
-        got = hashlib.sha256(open(out, "rb").read()).hexdigest()
-        if got != want:
-            os.remove(out)
-            tc.fail("the download's checksum doesn't match: try again", "network")
+    token = get_github_token()
+    downloaded = False
+    if token and found.get("zip_api"):
+        try:
+            download_stream(found["zip_api"], out, token=token, is_asset_api=True)
+            downloaded = True
+        except urllib.error.HTTPError as e:
+            if e.code not in (401, 403, 404) or not found.get("zip"):
+                tc.fail("could not download release asset: %s" % e, "network")
+    if not downloaded:
+        download_stream(found["zip"], out, token=None, is_asset_api=False)
+
+    sha_url = found.get("sha256_api") if (token and found.get("sha256_api")) else found.get("sha256")
+    if sha_url:
+        try:
+            opener = urllib.request.build_opener(AuthRedirectHandler())
+            headers = {"User-Agent": "LVCS-update"}
+            if token and sha_url == found.get("sha256_api"):
+                headers["Accept"] = "application/octet-stream"
+                headers["Authorization"] = "Bearer " + token
+            req = urllib.request.Request(sha_url, headers=headers)
+            with opener.open(req, timeout=30) as r:
+                want = r.read().decode("utf-8", errors="replace").split()[0].lower()
+            got = hashlib.sha256(open(out, "rb").read()).hexdigest()
+            if got != want:
+                os.remove(out)
+                tc.fail("the download's checksum doesn't match: try again", "network")
+        except (OSError, ValueError):
+            pass
 
 
 def apply_appimage(mine, appimage_path=None, channel="auto"):
@@ -402,7 +522,8 @@ def apply_app(mine, zip_path=None, channel="auto"):
             print("[update] already the newest (%s)" % mine["version"])
             tc.event(result="ok", version=mine["version"])
             return
-        zip_path = os.path.join(UPDATE_DIR, found["zip"].rsplit("/", 1)[1])
+        zip_name = found.get("asset_name") or found["zip"].rsplit("/", 1)[1]
+        zip_path = os.path.join(UPDATE_DIR, zip_name)
         verified_download(found, zip_path)
         version = found["version"]
     tc.stage("apply", "Putting the new release in place")
@@ -514,7 +635,8 @@ def apply(zip_path=None, appimage_path=None, channel="auto"):
             print("[update] already the newest (%s)" % mine["version"])
             tc.event(result="ok", version=mine["version"])
             return
-        zip_path = os.path.join(UPDATE_DIR, found["zip"].rsplit("/", 1)[1])
+        zip_name = found.get("asset_name") or found["zip"].rsplit("/", 1)[1]
+        zip_path = os.path.join(UPDATE_DIR, zip_name)
         verified_download(found, zip_path)
     tc.stage("apply", "Putting the new release in place")
     failed = []
