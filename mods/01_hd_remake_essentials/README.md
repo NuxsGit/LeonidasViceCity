@@ -1,6 +1,6 @@
 # Vice City HD Remake Essentials
 
-This mod is active by default in **LeonidasViceCity**.
+This mod is active by default in **Leonidas ViceCityStories (LVCS)**.
 
 ### Features:
 - **Atmospheric Timecycle Remaster**: Vibrant 80s pastel colors, rich sunset oranges, deep purples, and radiant turquoise ocean.

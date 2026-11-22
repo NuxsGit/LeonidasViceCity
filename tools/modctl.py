@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""LeonidasViceCity - Mod Management Tool
+"""Leonidas ViceCityStories (LVCS) - Mod Management Tool
 
 Commands:
     python tools/modctl.py list                 List all installed mods and their status
     python tools/modctl.py enable <mod_id>      Enable a specific mod
     python tools/modctl.py disable <mod_id>     Disable a specific mod
-    python tools/modctl.py preset [hd|ps2]      Apply 'hd' (Leonidas HD Remake) or 'ps2' (Original) preset
+    python tools/modctl.py preset [hd|ps2]      Apply 'hd' (LVCS HD Remake) or 'ps2' (Original) preset
     python tools/modctl.py install <path>       Install a mod folder or zip archive
     python tools/modctl.py info <mod_id>        Show detailed mod information
 """
@@ -87,7 +87,7 @@ def cmd_list(args):
     hd_active = cfg.get("hd_remake_active", True)
 
     print("=" * 70)
-    print(" LeonidasViceCity - Mod Loader & HD Remake Engine")
+    print(" Leonidas ViceCityStories (LVCS) - Mod Loader & HD Remake Engine")
     print("=" * 70)
     print(f" HD Remake Preset: {'[ENABLED]' if hd_active else '[DISABLED]'}")
     print(f" Mods Directory:   {MODS_DIR}")
@@ -143,7 +143,7 @@ def cmd_preset(args):
             if m.get("category") in ("Visuals", "UI", "Gameplay"):
                 cfg.setdefault("mods", {})[m["id"]] = True
         save_config(cfg)
-        print("Leonidas HD Remake Preset APPLIED: All HD enhancements, shaders, and visual mods ENABLED.")
+        print("LVCS HD Remake Preset APPLIED: All HD enhancements, shaders, and visual mods ENABLED.")
     elif preset in ("ps2", "authentic", "vanilla"):
         cfg["hd_remake_active"] = False
         for m in get_mods():
@@ -208,7 +208,7 @@ def cmd_info(args):
 
 
 def main():
-    p = argparse.ArgumentParser(description="LeonidasViceCity Mod Management Utility")
+    p = argparse.ArgumentParser(description="Leonidas ViceCityStories (LVCS) Mod Management Utility")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("list", help="List installed mods")

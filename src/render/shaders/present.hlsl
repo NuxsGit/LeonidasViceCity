@@ -1,10 +1,10 @@
 // The game's picture letterboxed into the target: one quad from the vertex id (triangle strip of 4).
-// Enhanced for LeonidasViceCity with modern 80s Remake color grading, neon bloom, and ACES tonemapping.
+// Enhanced for Leonidas ViceCityStories (LVCS) with modern 80s Remake color grading, neon bloom, and ACES tonemapping.
 cbuffer Params : register(b0)
 {
     float4 rect;   // NDC: left, top, right, bottom
     float2 uvMax;  // the used part of the texture
-    float2 postFx; // x = mode (0 = original, 1 = Leonidas HD Remake), y = intensity
+    float2 postFx; // x = mode (0 = original, 1 = LVCS HD Remake), y = intensity
 };
 
 struct VSOut
@@ -42,7 +42,7 @@ float4 ps_main(VSOut i) : SV_Target
 
     if (postFx.x > 0.5)
     {
-        // Leonidas Vice City HD Remake Post-Processing
+        // Leonidas ViceCityStories (LVCS) HD Remake Post-Processing
         float3 rgb = col.rgb;
 
         // Warm sunset / cool neon color contrast

@@ -7,9 +7,11 @@
 #include <windows.h>
 #endif
 
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <map>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 

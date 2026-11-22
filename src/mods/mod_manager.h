@@ -1,4 +1,4 @@
-// LeonidasViceCity - Modding Engine and Virtual File System (VFS)
+// Leonidas ViceCityStories (LVCS) - Modding Engine and Virtual File System (VFS)
 // Manages mod discovery, priority, file interception (cdrom0: overrides),
 // and HD Remake enhancements.
 #pragma once

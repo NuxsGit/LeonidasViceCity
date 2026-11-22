@@ -281,7 +281,7 @@ namespace screens
         float mods(App &app, Rect r)
         {
             float y = r.y;
-            section(r, y, "LEONIDAS HD REMAKE");
+            section(r, y, "LVCS HD REMAKE");
             text(r, y, "Enable or tune integrated visual enhancements, modern PC controls, and custom mods.");
 
             // Master HD Remake Switch
@@ -289,7 +289,7 @@ namespace screens
                 const float cardH = px(56);
                 const Rect card{r.x - px(8), y, r.w + px(16), cardH};
                 rectEx(card, theme::kBase, mix(theme::kBase, theme::kPink, 0.15f), px(theme::kRadiusSmall), theme::ink(0.08f), ui::hairline());
-                drawText(kFontSemibold, px(theme::kBody), card.x + px(14), card.y + px(16), theme::kText, "HD Remake Engine");
+                drawText(kFontSemibold, px(theme::kBody), card.x + px(14), card.y + px(16), theme::kText, "LVCS HD Remake Engine");
                 drawText(kFontBody, px(theme::kSmall), card.x + px(14), card.y + px(34), theme::kDim, "Activates 4K textures, 80s neon shaders & ultra detail");
 
                 bool active = app.hdRemakePreset;
@@ -345,11 +345,11 @@ namespace screens
             divider(r, y);
 
             section(r, y, "ACTIONS");
-            if (action(r, y, "Open Mods Folder", ButtonStyle::Standard, theme::icon::kFolder))
+            if (action(r, y, "Open Mods Folder", ButtonStyle::Secondary, theme::icon::kFolder))
             {
                 app.openModsFolder();
             }
-            if (action(r, y, "Reload Mods", ButtonStyle::Standard, theme::icon::kRefresh))
+            if (action(r, y, "Reload Mods", ButtonStyle::Secondary, theme::icon::kRefresh))
             {
                 app.refreshMods();
             }
