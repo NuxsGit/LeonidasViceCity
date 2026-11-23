@@ -13,6 +13,10 @@ on:
         description: "Platforms to build: all, or any of linux windows macos"
         default: all
 
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
