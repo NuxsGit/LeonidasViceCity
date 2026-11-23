@@ -150,6 +150,42 @@ bool PSPadBackend::readState(int /*port*/, int /*slot*/, uint8_t *data, size_t s
     data[5] = toByte(ry);
     data[6] = toByte(lx);
     data[7] = toByte(ly);
+
+#if defined(__ANDROID__)
+    // TouchPort-style mobile touch controller state integration
+    extern "C" void getAndroidPadState(uint32_t &buttons, float &alx, float &aly, float &arx, float &ary);
+    uint32_t tBtns = 0;
+    float tLx = 0.0f, tLy = 0.0f, tRx = 0.0f, tRy = 0.0f;
+    getAndroidPadState(tBtns, tLx, tLy, tRx, tRy);
+    if (tBtns != 0)
+    {
+        press(tBtns & (1 << 0), PAD_SELECT);
+        press(tBtns & (1 << 1), PAD_L3);
+        press(tBtns & (1 << 2), PAD_R3);
+        press(tBtns & (1 << 3), PAD_START);
+        press(tBtns & (1 << 4), PAD_UP);
+        press(tBtns & (1 << 5), PAD_RIGHT);
+        press(tBtns & (1 << 6), PAD_DOWN);
+        press(tBtns & (1 << 7), PAD_LEFT);
+        press(tBtns & (1 << 8), PAD_L2);
+        press(tBtns & (1 << 9), PAD_R2);
+        press(tBtns & (1 << 10), PAD_L1);
+        press(tBtns & (1 << 11), PAD_R1);
+        press(tBtns & (1 << 12), PAD_TRIANGLE);
+        press(tBtns & (1 << 13), PAD_CIRCLE);
+        press(tBtns & (1 << 14), PAD_CROSS);
+        press(tBtns & (1 << 15), PAD_SQUARE);
+    }
+    if (tLx != 0.0f || tLy != 0.0f) {
+        data[6] = toByte(tLx);
+        data[7] = toByte(tLy);
+    }
+    if (tRx != 0.0f || tRy != 0.0f) {
+        data[4] = toByte(tRx);
+        data[5] = toByte(tRy);
+    }
+#endif
+
     data[2] = static_cast<uint8_t>(btns & 0xFF);
     data[3] = static_cast<uint8_t>(btns >> 8);
     return true;

@@ -45,18 +45,22 @@ if((CMAKE_C_COMPILER MATCHES "arm-vita-eabi") OR
 endif()
 
 if(PS2X_IS_ARM_TARGET)
-    message(STATUS "ARM target detected, fetching sse2neon")
+    message(STATUS "ARM target detected, setting up sse2neon")
 
-    include(FetchContent)
-    FetchContent_Declare(
-        sse2neon
-        GIT_REPOSITORY https://github.com/DLTcollab/sse2neon.git
-        GIT_TAG v1.9.1
-        GIT_SHALLOW TRUE
-    )
-    FetchContent_MakeAvailable(sse2neon)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../sse2neon/sse2neon.h")
+        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../sse2neon)
+    else()
+        include(FetchContent)
+        FetchContent_Declare(
+            sse2neon
+            GIT_REPOSITORY https://github.com/DLTcollab/sse2neon.git
+            GIT_TAG v1.9.1
+            GIT_SHALLOW TRUE
+        )
+        FetchContent_MakeAvailable(sse2neon)
+        include_directories(${sse2neon_SOURCE_DIR})
+    endif()
 
-    include_directories(${sse2neon_SOURCE_DIR})
     add_compile_definitions(USE_SSE2NEON)
     # [gta-recomp] The x86 results bit for bit (docs/MACOS.md): PS2 floats with an all-ones exponent are NaN on the
     # host and go through minps / maxps (VMINI / VMAX), which return the second operand on NaN on x86 only with this;

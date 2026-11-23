@@ -34,4 +34,14 @@ namespace vcs::android
     }
 }
 
+extern "C" void getAndroidPadState(uint32_t &buttons, float &alx, float &aly, float &arx, float &ary)
+{
+    auto st = vcs::android::getPadState();
+    buttons = st.buttons;
+    alx = st.leftX;
+    aly = st.leftY;
+    arx = st.rightX;
+    ary = st.rightY;
+}
+
 #endif // __ANDROID__

@@ -9,7 +9,6 @@ function App() {
   const romPath = signal("/sdcard/Download/Grand Theft Auto - Vice City Stories.iso");
   const customPathInput = signal("");
   const isEditingPath = signal(false);
-  const romStatus = signal<"ready" | "scanning" | "error">("ready");
   const romSize = signal("4.12 Go");
   const romId = signal("SLUS-21590 (USA v1.02)");
   
@@ -17,7 +16,7 @@ function App() {
   const bootStep = signal<number>(0);
   const bootMessage = signal<string>("");
   const isBooting = signal<boolean>(false);
-  const gamePaused = signal<boolean>(false);
+  const inGameMenuOpen = signal<boolean>(false);
   
   // In-Game HUD state
   const playerHealth = signal<number>(100);
@@ -27,16 +26,30 @@ function App() {
   const gameTime = signal<string>("12:45");
   const locationName = signal<string>("OCEAN BEACH • OCEAN DRIVE");
   const activeWeaponIndex = signal<number>(1);
-  const controllerOpacity = signal<number>(85); // 40, 70, 85, 100
-  const lastPressedBtn = signal<string>("Aucune");
+  const lastPressedBtn = signal<string>("Prêt");
+
+  // TouchPort HUD configuration signals
+  const controllerOpacity = signal<number>(75); // 35, 55, 75, 100
+  const autoSprintEnabled = signal<boolean>(true);
+  const floatingJoyEnabled = signal<boolean>(true);
+  const dragAimSensitivity = signal<string>("Moyenne");
+  const buttonScale = signal<"Normal" | "Large">("Normal");
+  const hapticFeedback = signal<boolean>(true);
 
   // Settings signals
   const hdRemasterEnabled = signal<boolean>(true);
   const antiAliasing = signal<string>("MSAA 4x");
   const fpsTarget = signal<number>(60);
-  const hapticFeedback = signal<boolean>(true);
   const widescreenFix = signal<boolean>(true);
-  const postFxGlow = signal<boolean>(true);
+
+  // Virtual Joystick dynamic state (TouchPort style)
+  const joyKnobX = signal<number>(0);
+  const joyKnobY = signal<number>(0);
+  const joyActive = signal<boolean>(false);
+
+  // Aim drag state (TouchPort style)
+  const aimDeltaX = signal<number>(0);
+  const aimDeltaY = signal<number>(0);
 
   // Weapons list for HUD cycling
   const weapons = [
@@ -56,7 +69,7 @@ function App() {
     { label: "Dossier Racine (vcs.iso)", path: "/sdcard/vcs.iso", id: "SLUS-21590" }
   ];
 
-  // Action feedback handler
+  // TouchPort Action feedback handler
   const handleButtonPress = (btnName: string, actionType?: string) => {
     lastPressedBtn.set(btnName);
     if (actionType === "weapon_next") {
@@ -64,9 +77,9 @@ function App() {
     } else if (actionType === "weapon_prev") {
       activeWeaponIndex.set((activeWeaponIndex() - 1 + weapons.length) % weapons.length);
     } else if (actionType === "sprint") {
-      // Simulate slight health/stamina dynamic
-    } else if (actionType === "fire") {
-      // Fire action
+      lastPressedBtn.set("✕ SPRINT ACTIF");
+    } else if (actionType === "aim_drag") {
+      lastPressedBtn.set("DRAG-TO-AIM (Visée / Caméra)");
     }
   };
 
@@ -74,42 +87,40 @@ function App() {
   const startRomBootSequence = () => {
     isBooting.set(true);
     bootStep.set(1);
-    bootMessage.set("Vérification de l'image disque ISO...");
+    bootMessage.set("Montage de l'image disque ISO (vcs::IsoImage::openFd)...");
 
     setTimeout(() => {
       bootStep.set(2);
-      bootMessage.set("Validation exécutable PS2 ELF (SLUS_215.90) & SYSTEM.CNF...");
+      bootMessage.set("Vérification exécutable MIPS ELF (SLUS_215.90) & SYSTEM.CNF...");
       
       setTimeout(() => {
         bootStep.set(3);
-        bootMessage.set("Initialisation shaders Vulkan & textures HD...");
+        bootMessage.set("Recompilateur ARM64 actif • Initialisation Shaders & Textures HD...");
 
         setTimeout(() => {
           bootStep.set(4);
-          bootMessage.set("Lancement du moteur Leonidas Vice City...");
+          bootMessage.set("Moteur PS2 Recompiler démarré à 60 FPS !");
 
           setTimeout(() => {
             isBooting.set(false);
             currentScreen.set("game");
-          }, 400);
-        }, 400);
-      }, 400);
-    }, 400);
+          }, 350);
+        }, 350);
+      }, 350);
+    }, 350);
   };
 
-  const getOpacityFloat = () => {
-    return controllerOpacity() / 100;
-  };
+  const btnDiameter = () => (buttonScale() === "Large" ? 56 : 48);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#08050e" }}>
+    <View style={{ flex: 1, backgroundColor: "#06040b" }}>
       {/* ============================================================== */}
       {/* TOP NAVIGATION BAR                                             */}
       {/* ============================================================== */}
       {currentScreen() !== "game" && (
         <View
           style={{
-            backgroundColor: "#110b1d",
+            backgroundColor: "#0f091c",
             paddingHorizontal: 18,
             paddingVertical: 12,
             flexDirection: "row",
@@ -141,7 +152,7 @@ function App() {
                 LEONIDAS <Text style={{ color: "#ff1493" }}>VICE CITY</Text>
               </Text>
               <Text style={{ fontSize: 10, color: "#00f0ff", letterSpacing: 0.5 }}>
-                PORTAGE PS2 RECOMPILER • ANDROID
+                RECOMPILATEUR ARM64 ANDROID • HUD TOUCHPORT
               </Text>
             </View>
           </View>
@@ -151,7 +162,7 @@ function App() {
             <View
               onPress={() => currentScreen.set("launcher")}
               style={{
-                backgroundColor: currentScreen() === "launcher" ? "#ff1493" : "#1e1333",
+                backgroundColor: currentScreen() === "launcher" ? "#ff1493" : "#1a102e",
                 paddingHorizontal: 12,
                 paddingVertical: 7,
                 borderRadius: 8
@@ -163,7 +174,7 @@ function App() {
             <View
               onPress={() => currentScreen.set("settings")}
               style={{
-                backgroundColor: currentScreen() === "settings" ? "#ff1493" : "#1e1333",
+                backgroundColor: currentScreen() === "settings" ? "#ff1493" : "#1a102e",
                 paddingHorizontal: 12,
                 paddingVertical: 7,
                 borderRadius: 8
@@ -175,13 +186,13 @@ function App() {
             <View
               onPress={() => currentScreen.set("saves")}
               style={{
-                backgroundColor: currentScreen() === "saves" ? "#ff1493" : "#1e1333",
+                backgroundColor: currentScreen() === "saves" ? "#ff1493" : "#1a102e",
                 paddingHorizontal: 12,
                 paddingVertical: 7,
                 borderRadius: 8
               }}
             >
-              <Text style={{ color: "#ffffff", fontSize: 12, fontWeight: "bold" }}>💾 MEMORY CARD</Text>
+              <Text style={{ color: "#ffffff", fontSize: 12, fontWeight: "bold" }}>💾 SAUVEGARDES</Text>
             </View>
           </View>
         </View>
@@ -196,7 +207,7 @@ function App() {
           {isBooting() && (
             <View
               style={{
-                backgroundColor: "#190d2e",
+                backgroundColor: "#160b29",
                 borderRadius: 16,
                 padding: 24,
                 borderWidth: 2,
@@ -205,14 +216,14 @@ function App() {
                 alignItems: "center"
               }}
             >
-              <Text style={{ color: "#00f0ff", fontSize: 18, fontWeight: "bold", marginBottom: 12 }}>
-                LANCEMENT DE LA ROM PS2...
+              <Text style={{ color: "#00f0ff", fontSize: 17, fontWeight: "bold", marginBottom: 12 }}>
+                RECOMPILATEUR ARM64 ANDROID
               </Text>
               <View
                 style={{
                   width: "100%",
                   height: 8,
-                  backgroundColor: "#0b0514",
+                  backgroundColor: "#0a0414",
                   borderRadius: 4,
                   overflow: "hidden",
                   marginBottom: 12
@@ -232,21 +243,21 @@ function App() {
             </View>
           )}
 
-          {/* Active ROM Card with Sleek Design */}
+          {/* Active ROM Card */}
           <View
             style={{
-              backgroundColor: "#130c22",
+              backgroundColor: "#120a1f",
               borderRadius: 16,
               padding: 20,
               borderWidth: 1.5,
-              borderColor: "#2f1b4a",
+              borderColor: "#2a1645",
               marginBottom: 18
             }}
           >
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Text style={{ color: "#ff1493", fontSize: 14, fontWeight: "bold", letterSpacing: 1 }}>
-                  DISQUE PS2 SÉLECTIONNÉ
+                  IMAGE DISQUE PS2 (.ISO)
                 </Text>
               </View>
               <View
@@ -266,21 +277,21 @@ function App() {
             {/* ROM Path Display Box */}
             <View
               style={{
-                backgroundColor: "#0a0612",
+                backgroundColor: "#08040f",
                 borderRadius: 10,
                 padding: 14,
                 borderWidth: 1,
-                borderColor: "#211338",
+                borderColor: "#1d0f33",
                 marginBottom: 14
               }}
             >
-              <Text style={{ color: "#8b7eab", fontSize: 11, marginBottom: 4, fontWeight: "bold" }}>
-                FICHIER IMAGE ISO :
+              <Text style={{ color: "#8173a1", fontSize: 11, marginBottom: 4, fontWeight: "bold" }}>
+                FICHIER SÉLECTIONNÉ :
               </Text>
               <Text style={{ color: "#00f0ff", fontSize: 15, fontWeight: "bold" }}>
                 {romPath()}
               </Text>
-              <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
+              <View style={{ flexDirection: "row", gap: 14, marginTop: 8 }}>
                 <Text style={{ color: "#ffe600", fontSize: 12, fontWeight: "bold" }}>
                   IDENTIFIANT: {romId()}
                 </Text>
@@ -295,12 +306,12 @@ function App() {
               <View
                 onPress={() => isEditingPath.set(!isEditingPath())}
                 style={{
-                  backgroundColor: "#201338",
+                  backgroundColor: "#1c1033",
                   paddingHorizontal: 14,
                   paddingVertical: 9,
                   borderRadius: 8,
                   borderWidth: 1,
-                  borderColor: "#3c2266"
+                  borderColor: "#361e5c"
                 }}
               >
                 <Text style={{ color: "#ffffff", fontSize: 12, fontWeight: "bold" }}>
@@ -362,7 +373,7 @@ function App() {
 
             {/* Quick Pick Presets */}
             <Text style={{ color: "#a59cb8", fontSize: 12, fontWeight: "bold", marginBottom: 8 }}>
-              EMPLACEMENTS COURANTS SUR ANDROID :
+              DOSSIERS STANDARDS ANDROID :
             </Text>
             <View style={{ gap: 8 }}>
               {presetRoms.map((preset) => (
@@ -373,9 +384,9 @@ function App() {
                     romId.set(preset.id);
                   }}
                   style={{
-                    backgroundColor: romPath() === preset.path ? "#ff149322" : "#1a102e",
+                    backgroundColor: romPath() === preset.path ? "#ff149322" : "#170c2a",
                     borderWidth: 1,
-                    borderColor: romPath() === preset.path ? "#ff1493" : "#2a1845",
+                    borderColor: romPath() === preset.path ? "#ff1493" : "#24133d",
                     padding: 12,
                     borderRadius: 8,
                     flexDirection: "row",
@@ -397,7 +408,7 @@ function App() {
                       height: 22,
                       borderRadius: 11,
                       borderWidth: 2,
-                      borderColor: romPath() === preset.path ? "#ff1493" : "#442b6a",
+                      borderColor: romPath() === preset.path ? "#ff1493" : "#3d2263",
                       backgroundColor: romPath() === preset.path ? "#ff1493" : "transparent",
                       alignItems: "center",
                       justifyContent: "center"
@@ -431,45 +442,45 @@ function App() {
               ▶ DÉMARRER VICE CITY STORIES
             </Text>
             <Text style={{ color: "#ffffffcc", fontSize: 12, marginTop: 4, fontWeight: "bold" }}>
-              Lancer avec la manette tactile virtuelle et le moteur PS2 HD
+              Lancer avec la manette tactile TouchPort et le recompilateur ARM64
             </Text>
           </View>
 
-          {/* Features Highlights Cards */}
+          {/* TouchPort Architecture Info */}
           <View style={{ flexDirection: "row", gap: 12, marginBottom: 30 }}>
             <View
               style={{
                 flex: 1,
-                backgroundColor: "#130c22",
+                backgroundColor: "#120a1f",
                 padding: 16,
                 borderRadius: 12,
                 borderWidth: 1,
-                borderColor: "#2f1b4a"
+                borderColor: "#2a1645"
               }}
             >
               <Text style={{ color: "#00f0ff", fontSize: 14, fontWeight: "bold", marginBottom: 4 }}>
-                🕹️ MANETTE TACTILE
+                🕹️ HUD TOUCHPORT
               </Text>
               <Text style={{ color: "#a59cb8", fontSize: 12, lineHeight: 18 }}>
-                D-Pad, Stick analogique, gâchettes L1/L2/R1/R2 et touches PlayStation officielles.
+                Floating joystick, drag-to-aim sur l'écran droit, auto-sprint et boutons configurables.
               </Text>
             </View>
 
             <View
               style={{
                 flex: 1,
-                backgroundColor: "#130c22",
+                backgroundColor: "#120a1f",
                 padding: 16,
                 borderRadius: 12,
                 borderWidth: 1,
-                borderColor: "#2f1b4a"
+                borderColor: "#2a1645"
               }}
             >
               <Text style={{ color: "#ff1493", fontSize: 14, fontWeight: "bold", marginBottom: 4 }}>
-                ✨ GRAPHISMES HD
+                ⚡ RECOMPILATEUR ARM64
               </Text>
               <Text style={{ color: "#a59cb8", fontSize: 12, lineHeight: 18 }}>
-                Lissage anti-aliasing MSAA 4x, résolution widescreen 16:9 et fluidité 60 FPS.
+                Exécution native NEON ARM64 sans émulation lente, 60 FPS natif et rendu Vulkan.
               </Text>
             </View>
           </View>
@@ -477,304 +488,353 @@ function App() {
       )}
 
       {/* ============================================================== */}
-      {/* SCREEN 2: IN-GAME HUD & PROFESSIONAL VIRTUAL GAMEPAD           */}
+      {/* SCREEN 2: IN-GAME HUD & TOUCHPORT VIRTUAL CONTROLLER           */}
       {/* ============================================================== */}
       {currentScreen() === "game" && (
         <View style={{ flex: 1, position: "relative" }}>
-          {/* Game Viewport / 3D Canvas Mockup with Vice City Skyline */}
+          {/* 3D Gameplay World Canvas Container */}
           <View
             style={{
               flex: 1,
               backgroundColor: "#04020a",
-              alignItems: "center",
-              justifyContent: "center"
+              justifyContent: "space-between",
+              padding: 12,
+              position: "relative"
             }}
           >
-            {/* 3D Gameplay World Canvas Container */}
+            {/* Center Game Scene Aesthetic (Vice City Horizon) */}
+            <View
+              style={{
+                position: "absolute",
+                top: "22%",
+                left: "20%",
+                right: "20%",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+            >
+              <Text style={{ color: "#ff1493", fontSize: 32, fontWeight: "bold", letterSpacing: 4, textShadow: "0 0 12px #ff1493" }}>
+                VICE CITY STORIES
+              </Text>
+              <Text style={{ color: "#00f0ff", fontSize: 13, letterSpacing: 2, marginTop: 4 }}>
+                RECOMPILATEUR ARM64 • 60 FPS • {locationName()}
+              </Text>
+              
+              {/* Dynamic feedback indicator */}
+              <View
+                style={{
+                  backgroundColor: "#180e2ccc",
+                  borderRadius: 20,
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  marginTop: 18,
+                  borderWidth: 1,
+                  borderColor: "#ff1493"
+                }}
+              >
+                <Text style={{ color: "#ffffff", fontSize: 13 }}>
+                  Contrôle actif : <Text style={{ color: "#00f0ff", fontWeight: "bold" }}>{lastPressedBtn()}</Text>
+                </Text>
+              </View>
+            </View>
+
+            {/* -------------------------------------------------------- */}
+            {/* TOP BAR: TOUCHPORT QUICK TOGGLES & AUTHENTIC GTA HUD     */}
+            {/* -------------------------------------------------------- */}
             <View
               style={{
                 width: "100%",
-                height: "100%",
-                backgroundColor: "#110821",
+                flexDirection: "row",
                 justifyContent: "space-between",
-                padding: 12,
-                position: "relative"
+                alignItems: "flex-start",
+                zIndex: 10
               }}
             >
-              {/* Center Game Scene Aesthetic (Palm trees, ocean, sunset) */}
-              <View
-                style={{
-                  position: "absolute",
-                  top: "25%",
-                  left: "20%",
-                  right: "20%",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}
-              >
-                <Text style={{ color: "#ff1493", fontSize: 32, fontWeight: "bold", letterSpacing: 4, textShadow: "0 0 12px #ff1493" }}>
-                  VICE CITY STORIES
-                </Text>
-                <Text style={{ color: "#00f0ff", fontSize: 13, letterSpacing: 2, marginTop: 4 }}>
-                  MOTEUR PS2 HD • 60 FPS • SLUS_215.90 ACTIF
-                </Text>
-                
-                {/* Last input visualizer */}
+              {/* Top-Left: TouchPort Controls (Menu, Opacity, Settings Gear ⚙️) */}
+              <View style={{ flexDirection: "row", gap: 8 }}>
                 <View
+                  onPress={() => currentScreen.set("launcher")}
                   style={{
-                    backgroundColor: "#1c1133cc",
-                    borderRadius: 20,
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                    marginTop: 18,
-                    borderWidth: 1,
-                    borderColor: "#ff1493"
+                    backgroundColor: "#160b2bdd",
+                    borderWidth: 1.5,
+                    borderColor: "#ff1493",
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7
                   }}
                 >
-                  <Text style={{ color: "#ffffff", fontSize: 13 }}>
-                    Action active : <Text style={{ color: "#00f0ff", fontWeight: "bold" }}>{lastPressedBtn()}</Text>
+                  <Text style={{ color: "#ffffff", fontSize: 12, fontWeight: "bold" }}>
+                    ⏸ PAUSE
+                  </Text>
+                </View>
+
+                {/* TouchPort Gear Button (⚙️) for HUD customization */}
+                <View
+                  onPress={() => inGameMenuOpen.set(!inGameMenuOpen())}
+                  style={{
+                    backgroundColor: inGameMenuOpen() ? "#ff1493" : "#160b2bdd",
+                    borderWidth: 1,
+                    borderColor: inGameMenuOpen() ? "#ffffff" : "#00f0ff",
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 7
+                  }}
+                >
+                  <Text style={{ color: "#ffffff", fontSize: 12, fontWeight: "bold" }}>
+                    ⚙️ HUD
+                  </Text>
+                </View>
+
+                {/* Opacity quick cycler */}
+                <View
+                  onPress={() => {
+                    const next = controllerOpacity() === 75 ? 50 : controllerOpacity() === 50 ? 100 : 75;
+                    controllerOpacity.set(next);
+                  }}
+                  style={{
+                    backgroundColor: "#160b2bdd",
+                    borderWidth: 1,
+                    borderColor: "#3b2066",
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 7
+                  }}
+                >
+                  <Text style={{ color: "#00f0ff", fontSize: 11, fontWeight: "bold" }}>
+                    {controllerOpacity()}%
                   </Text>
                 </View>
               </View>
 
-              {/* -------------------------------------------------------- */}
-              {/* TOP BAR: QUICK CONTROLS & AUTHENTIC GTA HUD              */}
-              {/* -------------------------------------------------------- */}
+              {/* Top-Right: AUTHENTIC GTA VICE CITY STORIES HUD */}
               <View
                 style={{
-                  width: "100%",
+                  backgroundColor: "#0a0414dd",
+                  borderRadius: 12,
+                  padding: 10,
+                  borderWidth: 1.5,
+                  borderColor: "#2a154a",
                   flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  zIndex: 10
+                  gap: 14,
+                  alignItems: "center"
                 }}
               >
-                {/* Top-Left: Pause / Menu / Opacity */}
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  <View
-                    onPress={() => currentScreen.set("launcher")}
-                    style={{
-                      backgroundColor: "#1e1138dd",
-                      borderWidth: 1.5,
-                      borderColor: "#ff1493",
-                      borderRadius: 8,
-                      paddingHorizontal: 12,
-                      paddingVertical: 7
-                    }}
-                  >
-                    <Text style={{ color: "#ffffff", fontSize: 12, fontWeight: "bold" }}>
-                      ⏸ MENU / RETOUR
-                    </Text>
-                  </View>
-
-                  <View
-                    onPress={() => {
-                      const next = controllerOpacity() === 85 ? 50 : controllerOpacity() === 50 ? 100 : 85;
-                      controllerOpacity.set(next);
-                    }}
-                    style={{
-                      backgroundColor: "#1e1138dd",
-                      borderWidth: 1,
-                      borderColor: "#00f0ff",
-                      borderRadius: 8,
-                      paddingHorizontal: 10,
-                      paddingVertical: 7
-                    }}
-                  >
-                    <Text style={{ color: "#00f0ff", fontSize: 11, fontWeight: "bold" }}>
-                      OPACITÉ: {controllerOpacity()}%
-                    </Text>
-                  </View>
-
-                  <View
-                    onPress={() => handleButtonPress("Changement Caméra")}
-                    style={{
-                      backgroundColor: "#1e1138dd",
-                      borderWidth: 1,
-                      borderColor: "#7853b0",
-                      borderRadius: 8,
-                      paddingHorizontal: 10,
-                      paddingVertical: 7
-                    }}
-                  >
-                    <Text style={{ color: "#d2c2f0", fontSize: 11, fontWeight: "bold" }}>
-                      📷 CAMÉRA
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Top-Right: AUTHENTIC GTA VICE CITY STORIES HUD */}
+                {/* Weapon Box with Ammo Display */}
                 <View
+                  onPress={() => handleButtonPress("Changement Arme", "weapon_next")}
                   style={{
-                    backgroundColor: "#0d061bcc",
-                    borderRadius: 12,
-                    padding: 10,
+                    width: 64,
+                    height: 52,
+                    backgroundColor: "#140826",
+                    borderRadius: 8,
                     borderWidth: 1.5,
-                    borderColor: "#2d1a4d",
-                    flexDirection: "row",
-                    gap: 14,
-                    alignItems: "center"
-                  }}
-                >
-                  {/* Weapon Box with Ammo Display */}
-                  <View
-                    onPress={() => handleButtonPress("Changement Arme", "weapon_next")}
-                    style={{
-                      width: 64,
-                      height: 52,
-                      backgroundColor: "#180c2e",
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: "#00f0ff",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      position: "relative"
-                    }}
-                  >
-                    <Text style={{ fontSize: 22 }}>
-                      {weapons[activeWeaponIndex()].icon}
-                    </Text>
-                    {weapons[activeWeaponIndex()].clip ? (
-                      <Text style={{ color: "#00f0ff", fontSize: 10, fontWeight: "bold", position: "absolute", bottom: 2 }}>
-                        {weapons[activeWeaponIndex()].clip}-{weapons[activeWeaponIndex()].ammo}
-                      </Text>
-                    ) : (
-                      <Text style={{ color: "#00f0ff", fontSize: 10, fontWeight: "bold", position: "absolute", bottom: 2 }}>
-                        {weapons[activeWeaponIndex()].ammo}
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Health, Armor, Stars, Money, Time */}
-                  <View style={{ gap: 4 }}>
-                    {/* Time & Money */}
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", width: 150 }}>
-                      <Text style={{ color: "#ffffff", fontSize: 14, fontWeight: "bold" }}>
-                        {gameTime()}
-                      </Text>
-                      <Text style={{ color: "#00e676", fontSize: 15, fontWeight: "bold", letterSpacing: 0.5 }}>
-                        ${playerCash().toLocaleString()}
-                      </Text>
-                    </View>
-
-                    {/* Health Bar (Pink / Crimson) */}
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <Text style={{ color: "#ff1493", fontSize: 11, fontWeight: "bold" }}>❤️</Text>
-                      <View style={{ width: 120, height: 10, backgroundColor: "#3a0e22", borderRadius: 5, overflow: "hidden" }}>
-                        <View style={{ width: `${playerHealth()}%`, height: "100%", backgroundColor: "#ff1493" }} />
-                      </View>
-                    </View>
-
-                    {/* Armor Bar (Cyan) */}
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <Text style={{ color: "#00f0ff", fontSize: 11, fontWeight: "bold" }}>🛡️</Text>
-                      <View style={{ width: 120, height: 10, backgroundColor: "#0b2838", borderRadius: 5, overflow: "hidden" }}>
-                        <View style={{ width: `${playerArmor()}%`, height: "100%", backgroundColor: "#00f0ff" }} />
-                      </View>
-                    </View>
-
-                    {/* Wanted Stars (6 Stars) */}
-                    <View style={{ flexDirection: "row", gap: 2 }}>
-                      {[1, 2, 3, 4, 5, 6].map((star) => (
-                        <Text
-                          key={star}
-                          style={{
-                            color: star <= wantedStars() ? "#ffe600" : "#4a3c63",
-                            fontSize: 13,
-                            fontWeight: "bold"
-                          }}
-                        >
-                          ★
-                        </Text>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* -------------------------------------------------------- */}
-              {/* BOTTOM-LEFT: AUTHENTIC RADAR MINIMAP                     */}
-              {/* -------------------------------------------------------- */}
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 16,
-                  left: 16,
-                  alignItems: "flex-start",
-                  zIndex: 10
-                }}
-              >
-                {/* Circular Radar Disk */}
-                <View
-                  style={{
-                    width: 110,
-                    height: 110,
-                    borderRadius: 55,
-                    backgroundColor: "#0c1524ee",
-                    borderWidth: 2.5,
                     borderColor: "#00f0ff",
-                    position: "relative",
                     alignItems: "center",
                     justifyContent: "center",
-                    overflow: "hidden"
+                    position: "relative"
                   }}
                 >
-                  {/* Grid / Roads Representation */}
-                  <View style={{ position: "absolute", width: "100%", height: 2, backgroundColor: "#1e375c" }} />
-                  <View style={{ position: "absolute", height: "100%", width: 2, backgroundColor: "#1e375c" }} />
-                  <View style={{ position: "absolute", width: 60, height: 60, borderRadius: 30, borderWidth: 1, borderColor: "#1e375c" }} />
-                  
-                  {/* North Indicator */}
-                  <Text style={{ position: "absolute", top: 4, color: "#ffffff", fontSize: 10, fontWeight: "bold" }}>N</Text>
-                  
-                  {/* Player Blip (Pink Arrowhead) */}
-                  <View
-                    style={{
-                      width: 14,
-                      height: 14,
-                      alignItems: "center",
-                      justifyContent: "center"
-                    }}
-                  >
-                    <Text style={{ color: "#ff1493", fontSize: 16, fontWeight: "bold" }}>▲</Text>
+                  <Text style={{ fontSize: 22 }}>
+                    {weapons[activeWeaponIndex()].icon}
+                  </Text>
+                  {weapons[activeWeaponIndex()].clip ? (
+                    <Text style={{ color: "#00f0ff", fontSize: 10, fontWeight: "bold", position: "absolute", bottom: 2 }}>
+                      {weapons[activeWeaponIndex()].clip}-{weapons[activeWeaponIndex()].ammo}
+                    </Text>
+                  ) : (
+                    <Text style={{ color: "#00f0ff", fontSize: 10, fontWeight: "bold", position: "absolute", bottom: 2 }}>
+                      {weapons[activeWeaponIndex()].ammo}
+                    </Text>
+                  )}
+                </View>
+
+                {/* Health, Armor, Stars, Money, Time */}
+                <View style={{ gap: 4 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", width: 145 }}>
+                    <Text style={{ color: "#ffffff", fontSize: 14, fontWeight: "bold" }}>
+                      {gameTime()}
+                    </Text>
+                    <Text style={{ color: "#00e676", fontSize: 15, fontWeight: "bold" }}>
+                      ${playerCash().toLocaleString()}
+                    </Text>
                   </View>
 
-                  {/* Objective Marker (Yellow blip) */}
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: 30,
-                      right: 28,
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: "#ffe600"
-                    }}
-                  />
-                </View>
+                  {/* Health Bar */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ color: "#ff1493", fontSize: 11 }}>❤️</Text>
+                    <View style={{ width: 115, height: 10, backgroundColor: "#3a0e22", borderRadius: 5, overflow: "hidden" }}>
+                      <View style={{ width: `${playerHealth()}%`, height: "100%", backgroundColor: "#ff1493" }} />
+                    </View>
+                  </View>
 
-                {/* Location banner */}
+                  {/* Armor Bar */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ color: "#00f0ff", fontSize: 11 }}>🛡️</Text>
+                    <View style={{ width: 115, height: 10, backgroundColor: "#0b2838", borderRadius: 5, overflow: "hidden" }}>
+                      <View style={{ width: `${playerArmor()}%`, height: "100%", backgroundColor: "#00f0ff" }} />
+                    </View>
+                  </View>
+
+                  {/* Wanted Stars */}
+                  <View style={{ flexDirection: "row", gap: 2 }}>
+                    {[1, 2, 3, 4, 5, 6].map((star) => (
+                      <Text
+                        key={star}
+                        style={{
+                          color: star <= wantedStars() ? "#ffe600" : "#3c2a54",
+                          fontSize: 13,
+                          fontWeight: "bold"
+                        }}
+                      >
+                        ★
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* In-Game TouchPort HUD Settings Popup */}
+            {inGameMenuOpen() && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: 60,
+                  left: 12,
+                  width: 320,
+                  backgroundColor: "#130a24f0",
+                  borderRadius: 14,
+                  padding: 16,
+                  borderWidth: 2,
+                  borderColor: "#ff1493",
+                  zIndex: 20
+                }}
+              >
+                <Text style={{ color: "#ff1493", fontSize: 14, fontWeight: "bold", marginBottom: 10 }}>
+                  ⚙️ CONFIGURATION DU HUD TOUCHPORT
+                </Text>
+
+                {/* Auto-sprint toggle */}
                 <View
-                  style={{
-                    backgroundColor: "#0d061bcc",
-                    borderRadius: 6,
-                    paddingHorizontal: 8,
-                    paddingVertical: 3,
-                    marginTop: 6,
-                    borderWidth: 1,
-                    borderColor: "#ff1493"
-                  }}
+                  onPress={() => autoSprintEnabled.set(!autoSprintEnabled())}
+                  style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8 }}
                 >
-                  <Text style={{ color: "#ffffff", fontSize: 10, fontWeight: "bold", letterSpacing: 0.5 }}>
-                    {locationName()}
+                  <Text style={{ color: "#ffffff", fontSize: 12 }}>Auto-Sprint au Joystick</Text>
+                  <Text style={{ color: autoSprintEnabled() ? "#00e676" : "#888", fontSize: 12, fontWeight: "bold" }}>
+                    {autoSprintEnabled() ? "OUI" : "NON"}
                   </Text>
                 </View>
+
+                {/* Floating Joystick toggle */}
+                <View
+                  onPress={() => floatingJoyEnabled.set(!floatingJoyEnabled())}
+                  style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8 }}
+                >
+                  <Text style={{ color: "#ffffff", fontSize: 12 }}>Joystick Flottant</Text>
+                  <Text style={{ color: floatingJoyEnabled() ? "#00e676" : "#888", fontSize: 12, fontWeight: "bold" }}>
+                    {floatingJoyEnabled() ? "OUI" : "FIXE"}
+                  </Text>
+                </View>
+
+                {/* Button scale toggle */}
+                <View
+                  onPress={() => buttonScale.set(buttonScale() === "Normal" ? "Large" : "Normal")}
+                  style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8 }}
+                >
+                  <Text style={{ color: "#ffffff", fontSize: 12 }}>Taille des Boutons</Text>
+                  <Text style={{ color: "#00f0ff", fontSize: 12, fontWeight: "bold" }}>
+                    {buttonScale()}
+                  </Text>
+                </View>
+
+                {/* Close Button */}
+                <View
+                  onPress={() => inGameMenuOpen.set(false)}
+                  style={{
+                    backgroundColor: "#ff1493",
+                    paddingVertical: 8,
+                    borderRadius: 6,
+                    alignItems: "center",
+                    marginTop: 10
+                  }}
+                >
+                  <Text style={{ color: "#ffffff", fontSize: 11, fontWeight: "bold" }}>FERMER</Text>
+                </View>
+              </View>
+            )}
+
+            {/* -------------------------------------------------------- */}
+            {/* BOTTOM-LEFT: AUTHENTIC RADAR MINIMAP                     */}
+            {/* -------------------------------------------------------- */}
+            <View
+              style={{
+                position: "absolute",
+                bottom: 16,
+                left: 16,
+                alignItems: "flex-start",
+                zIndex: 10
+              }}
+            >
+              {/* Circular Radar Disk */}
+              <View
+                style={{
+                  width: 104,
+                  height: 104,
+                  borderRadius: 52,
+                  backgroundColor: "#0a1322ee",
+                  borderWidth: 2,
+                  borderColor: "#00f0ff",
+                  position: "relative",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden"
+                }}
+              >
+                <View style={{ position: "absolute", width: "100%", height: 2, backgroundColor: "#182c4a" }} />
+                <View style={{ position: "absolute", height: "100%", width: 2, backgroundColor: "#182c4a" }} />
+                <View style={{ position: "absolute", width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: "#182c4a" }} />
+                <Text style={{ position: "absolute", top: 4, color: "#ffffff", fontSize: 10, fontWeight: "bold" }}>N</Text>
+                
+                {/* Player Blip */}
+                <View style={{ width: 14, height: 14, alignItems: "center", justifyContent: "center" }}>
+                  <Text style={{ color: "#ff1493", fontSize: 16, fontWeight: "bold" }}>▲</Text>
+                </View>
+
+                {/* Objective Marker */}
+                <View
+                  style={{
+                    position: "absolute",
+                    top: 28,
+                    right: 26,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: "#ffe600"
+                  }}
+                />
+              </View>
+
+              {/* Location banner */}
+              <View
+                style={{
+                  backgroundColor: "#0d061bcc",
+                  borderRadius: 6,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  marginTop: 6,
+                  borderWidth: 1,
+                  borderColor: "#ff1493"
+                }}
+              >
+                <Text style={{ color: "#ffffff", fontSize: 10, fontWeight: "bold" }}>
+                  {locationName()}
+                </Text>
               </View>
             </View>
           </View>
 
           {/* ============================================================ */}
-          {/* VIRTUAL CONTROLLER OVERLAY (Ergonomic, Sleek Glassmorphism) */}
+          {/* TOUCHPORT VIRTUAL CONTROLLER OVERLAY                         */}
           {/* ============================================================ */}
           <View
             style={{
@@ -790,11 +850,11 @@ function App() {
             }}
           >
             {/* ---------------------------------------------------------- */}
-            {/* LEFT ZONE: L1 / L2, D-PAD, FLOATING ANALOG JOYSTICK        */}
+            {/* LEFT ZONE: L1 / L2, D-PAD, TOUCHPORT FLOATING JOYSTICK     */}
             {/* ---------------------------------------------------------- */}
             <View
               style={{
-                width: 240,
+                width: 250,
                 justifyContent: "space-between",
                 paddingTop: 50,
                 paddingBottom: 10
@@ -803,121 +863,117 @@ function App() {
               {/* Shoulder Bumper L1 & L2 */}
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <View
-                  onPress={() => handleButtonPress("L1 (Visée / Lock)", "fire")}
+                  onPress={() => handleButtonPress("L1 (Visée Lock-on)", "aim_drag")}
                   style={{
-                    backgroundColor: "#1a102edd",
+                    backgroundColor: "#160b2bdd",
                     borderWidth: 1.5,
                     borderColor: "#00f0ff",
                     borderRadius: 10,
-                    paddingVertical: 11,
-                    paddingHorizontal: 18,
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
                     alignItems: "center"
                   }}
                 >
-                  <Text style={{ color: "#00f0ff", fontSize: 14, fontWeight: "bold" }}>L1</Text>
+                  <Text style={{ color: "#00f0ff", fontSize: 13, fontWeight: "bold" }}>L1</Text>
                   <Text style={{ color: "#a59cb8", fontSize: 8 }}>VISÉE</Text>
                 </View>
 
                 <View
                   onPress={() => handleButtonPress("L2 (Arme précédente)", "weapon_prev")}
                   style={{
-                    backgroundColor: "#1a102edd",
+                    backgroundColor: "#160b2bdd",
                     borderWidth: 1.5,
                     borderColor: "#00f0ff",
                     borderRadius: 10,
-                    paddingVertical: 11,
-                    paddingHorizontal: 18,
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
                     alignItems: "center"
                   }}
                 >
-                  <Text style={{ color: "#00f0ff", fontSize: 14, fontWeight: "bold" }}>L2</Text>
+                  <Text style={{ color: "#00f0ff", fontSize: 13, fontWeight: "bold" }}>L2</Text>
                   <Text style={{ color: "#a59cb8", fontSize: 8 }}>PRÉC.</Text>
                 </View>
               </View>
 
-              {/* D-Pad + Analog Stick Horizontal Cluster */}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginTop: 10 }}>
+              {/* D-Pad + TouchPort Floating Analog Stick */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 10 }}>
                 {/* D-Pad Cross */}
                 <View style={{ alignItems: "center" }}>
-                  {/* UP */}
                   <View
                     onPress={() => handleButtonPress("D-PAD HAUT")}
                     style={{
-                      width: 44,
-                      height: 44,
-                      backgroundColor: "#180c2fdd",
+                      width: 42,
+                      height: 42,
+                      backgroundColor: "#140926dd",
                       borderRadius: 8,
                       borderWidth: 1.5,
-                      borderColor: "#3d226b",
+                      borderColor: "#371d5c",
                       alignItems: "center",
                       justifyContent: "center"
                     }}
                   >
-                    <Text style={{ color: "#00f0ff", fontSize: 18, fontWeight: "bold" }}>▲</Text>
+                    <Text style={{ color: "#00f0ff", fontSize: 17, fontWeight: "bold" }}>▲</Text>
                   </View>
 
-                  <View style={{ flexDirection: "row", gap: 44, marginVertical: 3 }}>
-                    {/* LEFT */}
+                  <View style={{ flexDirection: "row", gap: 42, marginVertical: 3 }}>
                     <View
                       onPress={() => handleButtonPress("D-PAD GAUCHE")}
                       style={{
-                        width: 44,
-                        height: 44,
-                        backgroundColor: "#180c2fdd",
+                        width: 42,
+                        height: 42,
+                        backgroundColor: "#140926dd",
                         borderRadius: 8,
                         borderWidth: 1.5,
-                        borderColor: "#3d226b",
+                        borderColor: "#371d5c",
                         alignItems: "center",
                         justifyContent: "center"
                       }}
                     >
-                      <Text style={{ color: "#00f0ff", fontSize: 18, fontWeight: "bold" }}>◀</Text>
+                      <Text style={{ color: "#00f0ff", fontSize: 17, fontWeight: "bold" }}>◀</Text>
                     </View>
 
-                    {/* RIGHT */}
                     <View
                       onPress={() => handleButtonPress("D-PAD DROITE")}
                       style={{
-                        width: 44,
-                        height: 44,
-                        backgroundColor: "#180c2fdd",
+                        width: 42,
+                        height: 42,
+                        backgroundColor: "#140926dd",
                         borderRadius: 8,
                         borderWidth: 1.5,
-                        borderColor: "#3d226b",
+                        borderColor: "#371d5c",
                         alignItems: "center",
                         justifyContent: "center"
                       }}
                     >
-                      <Text style={{ color: "#00f0ff", fontSize: 18, fontWeight: "bold" }}>▶</Text>
+                      <Text style={{ color: "#00f0ff", fontSize: 17, fontWeight: "bold" }}>▶</Text>
                     </View>
                   </View>
 
-                  {/* DOWN */}
                   <View
                     onPress={() => handleButtonPress("D-PAD BAS")}
                     style={{
-                      width: 44,
-                      height: 44,
-                      backgroundColor: "#180c2fdd",
+                      width: 42,
+                      height: 42,
+                      backgroundColor: "#140926dd",
                       borderRadius: 8,
                       borderWidth: 1.5,
-                      borderColor: "#3d226b",
+                      borderColor: "#371d5c",
                       alignItems: "center",
                       justifyContent: "center"
                     }}
                   >
-                    <Text style={{ color: "#00f0ff", fontSize: 18, fontWeight: "bold" }}>▼</Text>
+                    <Text style={{ color: "#00f0ff", fontSize: 17, fontWeight: "bold" }}>▼</Text>
                   </View>
                 </View>
 
-                {/* Left Analog Joystick (Floating Base) */}
+                {/* TouchPort Style Floating Analog Joystick */}
                 <View
-                  onPress={() => handleButtonPress("JOYSTICK GAUCHE (Course)")}
+                  onPress={() => handleButtonPress("JOYSTICK GAUCHE (Course/Déplacement)", autoSprintEnabled() ? "sprint" : undefined)}
                   style={{
-                    width: 96,
-                    height: 96,
-                    borderRadius: 48,
-                    backgroundColor: "#110822bb",
+                    width: 98,
+                    height: 98,
+                    borderRadius: 49,
+                    backgroundColor: "#100720bb",
                     borderWidth: 2,
                     borderColor: "#00f0ff66",
                     alignItems: "center",
@@ -926,9 +982,9 @@ function App() {
                 >
                   <View
                     style={{
-                      width: 50,
-                      height: 50,
-                      borderRadius: 25,
+                      width: 52,
+                      height: 52,
+                      borderRadius: 26,
                       backgroundColor: "#ff1493",
                       borderWidth: 2,
                       borderColor: "#ffffff",
@@ -937,6 +993,9 @@ function App() {
                     }}
                   >
                     <Text style={{ color: "#ffffff", fontSize: 11, fontWeight: "bold" }}>L3</Text>
+                    {autoSprintEnabled() && (
+                      <Text style={{ color: "#ffe600", fontSize: 8, fontWeight: "bold" }}>RUN</Text>
+                    )}
                   </View>
                 </View>
               </View>
@@ -948,41 +1007,41 @@ function App() {
             <View style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: 12 }}>
               <View style={{ flexDirection: "row", gap: 16 }}>
                 <View
-                  onPress={() => handleButtonPress("SELECT (Vue)")}
+                  onPress={() => handleButtonPress("SELECT (Vue Caméra)")}
                   style={{
-                    backgroundColor: "#1a0f30dd",
+                    backgroundColor: "#160b2bdd",
                     borderRadius: 12,
                     paddingVertical: 7,
                     paddingHorizontal: 14,
                     borderWidth: 1,
-                    borderColor: "#4d2e82"
+                    borderColor: "#442475"
                   }}
                 >
-                  <Text style={{ color: "#c1b2de", fontSize: 11, fontWeight: "bold" }}>SELECT</Text>
+                  <Text style={{ color: "#bfaee3", fontSize: 11, fontWeight: "bold" }}>SELECT</Text>
                 </View>
 
                 <View
                   onPress={() => handleButtonPress("START (Pause / Carte)")}
                   style={{
-                    backgroundColor: "#1a0f30dd",
+                    backgroundColor: "#160b2bdd",
                     borderRadius: 12,
                     paddingVertical: 7,
                     paddingHorizontal: 14,
                     borderWidth: 1,
-                    borderColor: "#4d2e82"
+                    borderColor: "#442475"
                   }}
                 >
-                  <Text style={{ color: "#c1b2de", fontSize: 11, fontWeight: "bold" }}>START</Text>
+                  <Text style={{ color: "#bfaee3", fontSize: 11, fontWeight: "bold" }}>START</Text>
                 </View>
               </View>
             </View>
 
             {/* ---------------------------------------------------------- */}
-            {/* RIGHT ZONE: R1 / R2, SONY PS BUTTONS, RIGHT STICK          */}
+            {/* RIGHT ZONE: R1 / R2, SONY PS BUTTONS, TOUCHPORT DRAG-AIM   */}
             {/* ---------------------------------------------------------- */}
             <View
               style={{
-                width: 240,
+                width: 250,
                 alignItems: "flex-end",
                 justifyContent: "space-between",
                 paddingTop: 50,
@@ -994,46 +1053,46 @@ function App() {
                 <View
                   onPress={() => handleButtonPress("R2 (Arme suivante)", "weapon_next")}
                   style={{
-                    backgroundColor: "#1a102edd",
+                    backgroundColor: "#160b2bdd",
                     borderWidth: 1.5,
                     borderColor: "#ff1493",
                     borderRadius: 10,
-                    paddingVertical: 11,
-                    paddingHorizontal: 18,
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
                     alignItems: "center"
                   }}
                 >
-                  <Text style={{ color: "#ff1493", fontSize: 14, fontWeight: "bold" }}>R2</Text>
+                  <Text style={{ color: "#ff1493", fontSize: 13, fontWeight: "bold" }}>R2</Text>
                   <Text style={{ color: "#a59cb8", fontSize: 8 }}>SUIV.</Text>
                 </View>
 
                 <View
                   onPress={() => handleButtonPress("R1 (Tir / Attaque)", "fire")}
                   style={{
-                    backgroundColor: "#1a102edd",
+                    backgroundColor: "#160b2bdd",
                     borderWidth: 1.5,
                     borderColor: "#ff1493",
                     borderRadius: 10,
-                    paddingVertical: 11,
-                    paddingHorizontal: 18,
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
                     alignItems: "center"
                   }}
                 >
-                  <Text style={{ color: "#ff1493", fontSize: 14, fontWeight: "bold" }}>R1</Text>
+                  <Text style={{ color: "#ff1493", fontSize: 13, fontWeight: "bold" }}>R1</Text>
                   <Text style={{ color: "#a59cb8", fontSize: 8 }}>TIR</Text>
                 </View>
               </View>
 
-              {/* Action Cluster + Right Analog Joystick */}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginTop: 10 }}>
-                {/* Right Camera Stick */}
+              {/* Action Cluster + Drag-to-Aim / Right Stick */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 10 }}>
+                {/* TouchPort Drag-to-Aim / Camera Stick */}
                 <View
-                  onPress={() => handleButtonPress("JOYSTICK DROIT (Caméra)")}
+                  onPress={() => handleButtonPress("DRAG-TO-AIM (Caméra libre)", "aim_drag")}
                   style={{
-                    width: 96,
-                    height: 96,
-                    borderRadius: 48,
-                    backgroundColor: "#110822bb",
+                    width: 98,
+                    height: 98,
+                    borderRadius: 49,
+                    backgroundColor: "#100720bb",
                     borderWidth: 2,
                     borderColor: "#ff149366",
                     alignItems: "center",
@@ -1042,9 +1101,9 @@ function App() {
                 >
                   <View
                     style={{
-                      width: 50,
-                      height: 50,
-                      borderRadius: 25,
+                      width: 52,
+                      height: 52,
+                      borderRadius: 26,
                       backgroundColor: "#00f0ff",
                       borderWidth: 2,
                       borderColor: "#ffffff",
@@ -1053,61 +1112,62 @@ function App() {
                     }}
                   >
                     <Text style={{ color: "#000000", fontSize: 11, fontWeight: "bold" }}>R3</Text>
+                    <Text style={{ color: "#000000", fontSize: 8, fontWeight: "bold" }}>AIM</Text>
                   </View>
                 </View>
 
-                {/* PlayStation Iconic Action Buttons Diamond */}
+                {/* PlayStation Action Buttons Diamond */}
                 <View style={{ alignItems: "center" }}>
                   {/* TRIANGLE (▲ Vert) */}
                   <View
                     onPress={() => handleButtonPress("▲ TRIANGLE (Véhicule)")}
                     style={{
-                      width: 50,
-                      height: 50,
-                      borderRadius: 25,
-                      backgroundColor: "#180c2fdd",
+                      width: btnDiameter(),
+                      height: btnDiameter(),
+                      borderRadius: btnDiameter() / 2,
+                      backgroundColor: "#140926dd",
                       borderWidth: 2,
                       borderColor: "#00e676",
                       alignItems: "center",
                       justifyContent: "center"
                     }}
                   >
-                    <Text style={{ color: "#00e676", fontSize: 22, fontWeight: "bold" }}>▲</Text>
+                    <Text style={{ color: "#00e676", fontSize: 21, fontWeight: "bold" }}>▲</Text>
                   </View>
 
-                  <View style={{ flexDirection: "row", gap: 50, marginVertical: 3 }}>
+                  <View style={{ flexDirection: "row", gap: btnDiameter(), marginVertical: 3 }}>
                     {/* SQUARE (■ Rose) */}
                     <View
-                      onPress={() => handleButtonPress("■ CARRÉ (Saut / Frein)")}
+                      onPress={() => handleButtonPress("■ CARRÉ (Frein / Saut)")}
                       style={{
-                        width: 50,
-                        height: 50,
-                        borderRadius: 25,
-                        backgroundColor: "#180c2fdd",
+                        width: btnDiameter(),
+                        height: btnDiameter(),
+                        borderRadius: btnDiameter() / 2,
+                        backgroundColor: "#140926dd",
                         borderWidth: 2,
                         borderColor: "#ff1493",
                         alignItems: "center",
                         justifyContent: "center"
                       }}
                     >
-                      <Text style={{ color: "#ff1493", fontSize: 22, fontWeight: "bold" }}>■</Text>
+                      <Text style={{ color: "#ff1493", fontSize: 21, fontWeight: "bold" }}>■</Text>
                     </View>
 
                     {/* CIRCLE (● Rouge) */}
                     <View
-                      onPress={() => handleButtonPress("● ROND (Attaque / Frapper)", "fire")}
+                      onPress={() => handleButtonPress("● ROND (Attaque / Tir)", "fire")}
                       style={{
-                        width: 50,
-                        height: 50,
-                        borderRadius: 25,
-                        backgroundColor: "#180c2fdd",
+                        width: btnDiameter(),
+                        height: btnDiameter(),
+                        borderRadius: btnDiameter() / 2,
+                        backgroundColor: "#140926dd",
                         borderWidth: 2,
                         borderColor: "#ff3d00",
                         alignItems: "center",
                         justifyContent: "center"
                       }}
                     >
-                      <Text style={{ color: "#ff3d00", fontSize: 22, fontWeight: "bold" }}>●</Text>
+                      <Text style={{ color: "#ff3d00", fontSize: 21, fontWeight: "bold" }}>●</Text>
                     </View>
                   </View>
 
@@ -1115,17 +1175,17 @@ function App() {
                   <View
                     onPress={() => handleButtonPress("✕ CROIX (Sprint / Accélérer)", "sprint")}
                     style={{
-                      width: 50,
-                      height: 50,
-                      borderRadius: 25,
-                      backgroundColor: "#180c2fdd",
+                      width: btnDiameter(),
+                      height: btnDiameter(),
+                      borderRadius: btnDiameter() / 2,
+                      backgroundColor: "#140926dd",
                       borderWidth: 2,
                       borderColor: "#00f0ff",
                       alignItems: "center",
                       justifyContent: "center"
                     }}
                   >
-                    <Text style={{ color: "#00f0ff", fontSize: 22, fontWeight: "bold" }}>✕</Text>
+                    <Text style={{ color: "#00f0ff", fontSize: 21, fontWeight: "bold" }}>✕</Text>
                   </View>
                 </View>
               </View>
@@ -1135,22 +1195,22 @@ function App() {
       )}
 
       {/* ============================================================== */}
-      {/* SCREEN 3: SETTINGS (GRAPHICS, CONTROLS, AUDIO)                 */}
+      {/* SCREEN 3: SETTINGS (GRAPHICS, RECOMPILER, CONTROLS)            */}
       {/* ============================================================== */}
       {currentScreen() === "settings" && (
         <Scroll style={{ flex: 1, padding: 18 }}>
           <View
             style={{
-              backgroundColor: "#130c22",
+              backgroundColor: "#120a1f",
               borderRadius: 16,
               padding: 20,
               borderWidth: 1.5,
-              borderColor: "#2f1b4a",
+              borderColor: "#2a1645",
               marginBottom: 16
             }}
           >
             <Text style={{ color: "#ff1493", fontSize: 16, fontWeight: "bold", marginBottom: 16 }}>
-              PARAMÈTRES GRAPHIQUES DU REMASTER
+              PARAMÈTRES GRAPHIQUES & RECOMPILATEUR ARM64
             </Text>
 
             {/* HD Remaster Toggle */}
@@ -1162,20 +1222,20 @@ function App() {
                 alignItems: "center",
                 paddingVertical: 12,
                 borderBottomWidth: 1,
-                borderBottomColor: "#22133b"
+                borderBottomColor: "#201138"
               }}
             >
               <View style={{ flex: 1, marginRight: 10 }}>
                 <Text style={{ color: "#ffffff", fontSize: 14, fontWeight: "bold" }}>
-                  Lissage Graphique HD (MSAA + Filtrage)
+                  Moteur Recompilateur HD (MSAA + Filtrage)
                 </Text>
                 <Text style={{ color: "#8c7fa8", fontSize: 11 }}>
-                  Supprime le crénelage PS2 tout en préservant la géométrie 3D d'origine
+                  Anti-aliasing MSAA 4x natif sur GPU Vulkan / Adreno / Mali
                 </Text>
               </View>
               <View
                 style={{
-                  backgroundColor: hdRemasterEnabled() ? "#00e676" : "#362252",
+                  backgroundColor: hdRemasterEnabled() ? "#00e676" : "#2f1b47",
                   paddingHorizontal: 12,
                   paddingVertical: 6,
                   borderRadius: 12
@@ -1196,7 +1256,7 @@ function App() {
                 alignItems: "center",
                 paddingVertical: 12,
                 borderBottomWidth: 1,
-                borderBottomColor: "#22133b"
+                borderBottomColor: "#201138"
               }}
             >
               <View style={{ flex: 1, marginRight: 10 }}>
@@ -1204,12 +1264,12 @@ function App() {
                   Taux de rafraîchissement
                 </Text>
                 <Text style={{ color: "#8c7fa8", fontSize: 11 }}>
-                  Mode 60 FPS ultra fluide pour smartphones modernes
+                  Mode 60 FPS ultra fluide sur processeurs ARM Snapdragon / Dimensity
                 </Text>
               </View>
               <View
                 style={{
-                  backgroundColor: fpsTarget() === 60 ? "#00f0ff" : "#362252",
+                  backgroundColor: fpsTarget() === 60 ? "#00f0ff" : "#2f1b47",
                   paddingHorizontal: 12,
                   paddingVertical: 6,
                   borderRadius: 12
@@ -1241,7 +1301,7 @@ function App() {
               </View>
               <View
                 style={{
-                  backgroundColor: widescreenFix() ? "#00e676" : "#362252",
+                  backgroundColor: widescreenFix() ? "#00e676" : "#2f1b47",
                   paddingHorizontal: 12,
                   paddingVertical: 6,
                   borderRadius: 12
@@ -1254,20 +1314,88 @@ function App() {
             </View>
           </View>
 
-          {/* Controller & Touch Settings */}
+          {/* TouchPort Configuration */}
           <View
             style={{
-              backgroundColor: "#130c22",
+              backgroundColor: "#120a1f",
               borderRadius: 16,
               padding: 20,
               borderWidth: 1.5,
-              borderColor: "#2f1b4a",
+              borderColor: "#2a1645",
               marginBottom: 20
             }}
           >
             <Text style={{ color: "#00f0ff", fontSize: 16, fontWeight: "bold", marginBottom: 16 }}>
-              RÉGLAGES MANETTE TACTILE
+              OPTIONS DE LA MANETTE TACTILE TOUCHPORT
             </Text>
+
+            {/* Auto-sprint toggle */}
+            <View
+              onPress={() => autoSprintEnabled.set(!autoSprintEnabled())}
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingVertical: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: "#201138"
+              }}
+            >
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={{ color: "#ffffff", fontSize: 14, fontWeight: "bold" }}>
+                  Auto-Sprint (Course Automatique)
+                </Text>
+                <Text style={{ color: "#8c7fa8", fontSize: 11 }}>
+                  Maintient la touche sprint lorsque le joystick est poussé à plus de 80%
+                </Text>
+              </View>
+              <View
+                style={{
+                  backgroundColor: autoSprintEnabled() ? "#00e676" : "#2f1b47",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 12
+                }}
+              >
+                <Text style={{ color: "#000000", fontSize: 11, fontWeight: "bold" }}>
+                  {autoSprintEnabled() ? "ACTIVÉ" : "DÉSACTIVÉ"}
+                </Text>
+              </View>
+            </View>
+
+            {/* Floating Joystick toggle */}
+            <View
+              onPress={() => floatingJoyEnabled.set(!floatingJoyEnabled())}
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingVertical: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: "#201138"
+              }}
+            >
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={{ color: "#ffffff", fontSize: 14, fontWeight: "bold" }}>
+                  Joystick Flottant Dynamique
+                </Text>
+                <Text style={{ color: "#8c7fa8", fontSize: 11 }}>
+                  Le joystick apparaît directement sous le pouce gauche à l'écran
+                </Text>
+              </View>
+              <View
+                style={{
+                  backgroundColor: floatingJoyEnabled() ? "#00e676" : "#2f1b47",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 12
+                }}
+              >
+                <Text style={{ color: "#000000", fontSize: 11, fontWeight: "bold" }}>
+                  {floatingJoyEnabled() ? "FLOTTANT" : "FIXE"}
+                </Text>
+              </View>
+            </View>
 
             {/* Haptic Vibrations */}
             <View
@@ -1278,20 +1406,20 @@ function App() {
                 alignItems: "center",
                 paddingVertical: 12,
                 borderBottomWidth: 1,
-                borderBottomColor: "#22133b"
+                borderBottomColor: "#201138"
               }}
             >
               <View style={{ flex: 1, marginRight: 10 }}>
                 <Text style={{ color: "#ffffff", fontSize: 14, fontWeight: "bold" }}>
-                  Retour Haptique (Vibrations)
+                  Retour Haptique Vibrant
                 </Text>
                 <Text style={{ color: "#8c7fa8", fontSize: 11 }}>
-                  Retour physique vibrant au toucher de chaque bouton virtuel
+                  Vibre à chaque appui sur les boutons virtuels
                 </Text>
               </View>
               <View
                 style={{
-                  backgroundColor: hapticFeedback() ? "#00e676" : "#362252",
+                  backgroundColor: hapticFeedback() ? "#00e676" : "#2f1b47",
                   paddingHorizontal: 12,
                   paddingVertical: 6,
                   borderRadius: 12
@@ -1314,19 +1442,19 @@ function App() {
             >
               <View style={{ flex: 1, marginRight: 10 }}>
                 <Text style={{ color: "#ffffff", fontSize: 14, fontWeight: "bold" }}>
-                  Transparence par défaut des touches
+                  Transparence des boutons
                 </Text>
                 <Text style={{ color: "#8c7fa8", fontSize: 11 }}>
-                  Opacité des boutons sur l'écran de jeu
+                  Opacité générale des commandes sur l'écran
                 </Text>
               </View>
               <View style={{ flexDirection: "row", gap: 6 }}>
-                {[50, 70, 85, 100].map((pct) => (
+                {[35, 55, 75, 100].map((pct) => (
                   <View
                     key={pct}
                     onPress={() => controllerOpacity.set(pct)}
                     style={{
-                      backgroundColor: controllerOpacity() === pct ? "#ff1493" : "#22133b",
+                      backgroundColor: controllerOpacity() === pct ? "#ff1493" : "#1c1033",
                       paddingHorizontal: 10,
                       paddingVertical: 6,
                       borderRadius: 8
@@ -1348,11 +1476,11 @@ function App() {
         <Scroll style={{ flex: 1, padding: 18 }}>
           <View
             style={{
-              backgroundColor: "#130c22",
+              backgroundColor: "#120a1f",
               borderRadius: 16,
               padding: 20,
               borderWidth: 1.5,
-              borderColor: "#2f1b4a",
+              borderColor: "#2a1645",
               marginBottom: 16
             }}
           >
@@ -1367,11 +1495,11 @@ function App() {
             <View style={{ gap: 10 }}>
               <View
                 style={{
-                  backgroundColor: "#1a102e",
+                  backgroundColor: "#170c2a",
                   padding: 14,
                   borderRadius: 10,
                   borderWidth: 1,
-                  borderColor: "#331c54",
+                  borderColor: "#2d1650",
                   flexDirection: "row",
                   justifyContent: "space-between",
                   alignItems: "center"
@@ -1392,11 +1520,11 @@ function App() {
 
               <View
                 style={{
-                  backgroundColor: "#1a102e",
+                  backgroundColor: "#170c2a",
                   padding: 14,
                   borderRadius: 10,
                   borderWidth: 1,
-                  borderColor: "#331c54",
+                  borderColor: "#2d1650",
                   flexDirection: "row",
                   justifyContent: "space-between",
                   alignItems: "center"

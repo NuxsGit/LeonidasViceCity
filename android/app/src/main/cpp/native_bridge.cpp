@@ -12,14 +12,22 @@
 #include <string>
 #include <cstdlib>
 
+#include "disc/iso_image.h"
+
 #define LOG_TAG "LeonidasNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+namespace vcs::android
+{
+    void setPadState(uint32_t buttons, float lx, float ly, float rx, float ry);
+}
 
 namespace
 {
     std::string g_romPath;
     int g_romFd = -1;
+    vcs::IsoImage g_isoImage;
     ANativeWindow *g_nativeWindow = nullptr;
     std::atomic<bool> g_engineRunning{false};
     std::atomic<bool> g_enginePaused{false};
@@ -54,9 +62,12 @@ Java_com_leonidas_vicecity_TouchControllerView_nativeSendPadState(
     state.rightX = rx;
     state.rightY = ry;
     g_padState.store(state, std::memory_order_relaxed);
+
+    // Forward to PS2 recomp Pad backend
+    vcs::android::setPadState(static_cast<uint32_t>(buttons), lx, ly, rx, ry);
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_com_leonidas_vicecity_GameActivity_nativeSetRomPath(
     JNIEnv *env, jclass, jstring path)
 {
@@ -66,15 +77,58 @@ Java_com_leonidas_vicecity_GameActivity_nativeSetRomPath(
         g_romPath = nativePath ? nativePath : "";
         env->ReleaseStringUTFChars(path, nativePath);
         LOGI("ROM Path configured: %s", g_romPath.c_str());
+
+        if (!g_romPath.empty())
+        {
+            if (g_isoImage.open(g_romPath))
+            {
+                LOGI("ROM successfully mounted: %s (%zu entries, %u sectors)",
+                     g_romPath.c_str(), g_isoImage.entries().size(), g_isoImage.totalSectors());
+                return JNI_TRUE;
+            }
+            else
+            {
+                LOGE("Failed to open ROM %s: %s", g_romPath.c_str(), g_isoImage.error().c_str());
+            }
+        }
     }
+    return JNI_FALSE;
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jboolean JNICALL
 Java_com_leonidas_vicecity_GameActivity_nativeSetRomFd(
     JNIEnv *, jclass, jint fd)
 {
     g_romFd = fd;
     LOGI("ROM File Descriptor configured: %d", g_romFd);
+    if (g_romFd >= 0)
+    {
+        if (g_isoImage.openFd(g_romFd))
+        {
+            LOGI("ROM successfully mounted from fd %d (%zu entries, %u sectors)",
+                 g_romFd, g_isoImage.entries().size(), g_isoImage.totalSectors());
+            return JNI_TRUE;
+        }
+        else
+        {
+            LOGE("Failed to open ROM from fd %d: %s", g_romFd, g_isoImage.error().c_str());
+        }
+    }
+    return JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_leonidas_vicecity_GameActivity_nativeGetRomSectors(
+    JNIEnv *, jclass)
+{
+    return g_isoImage.isOpen() ? static_cast<jint>(g_isoImage.totalSectors()) : 0;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_leonidas_vicecity_GameActivity_nativeGetRomError(
+    JNIEnv *env, jclass)
+{
+    return env->NewStringUTF(g_isoImage.error().c_str());
 }
 
 JNIEXPORT void JNICALL
@@ -121,7 +175,7 @@ JNIEXPORT void JNICALL
 Java_com_leonidas_vicecity_GameActivity_nativeStartEngine(
     JNIEnv *, jclass)
 {
-    LOGI("Starting Leonidas PS2 Engine on Android...");
+    LOGI("Starting Leonidas PS2 Engine on Android ARM64...");
     g_engineRunning.store(true);
     g_enginePaused.store(false);
 }
