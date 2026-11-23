@@ -17,5 +17,9 @@ if [ ! -f "$ISO_PATH" ]; then
     exit 1
 fi
 
+echo "[LVCS] Vérification et préparation du jeu..."
+python3 tools/build.py --recompile-if-needed "$ISO_PATH"
+
+echo ""
 echo "[LVCS] Lancement du jeu en mode HD Remake 4K / Anisotropic 16x..."
-python3 tools/run.py "$ISO_PATH"
+python3 tools/run.py 0 run --iso "$ISO_PATH"
