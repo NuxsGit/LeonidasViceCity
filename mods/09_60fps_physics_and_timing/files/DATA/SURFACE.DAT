@@ -1,0 +1,12 @@
+; Leonidas Vice City Stories - 60 FPS Surface Friction & Restitution Configuration
+; Type Adhesion Friction WetFriction Drag SkidNoise DustType
+TARMAC        1.05   1.00   0.88   0.02   SKID_TIRE   NONE
+TARMAC_WET    0.92   0.85   0.78   0.03   SKID_TIRE   WATER_SPRAY
+PAVEMENT      1.00   0.98   0.84   0.02   SKID_TIRE   NONE
+GRASS         0.78   0.72   0.65   0.08   SKID_DIRT   DIRT_DUST
+SAND          0.72   0.68   0.62   0.12   SKID_SAND   SAND_DUST
+BEACH_SAND    0.70   0.65   0.60   0.14   SKID_SAND   SAND_DUST
+DIRT_TRACK    0.82   0.78   0.70   0.06   SKID_DIRT   DIRT_DUST
+METAL         0.95   0.90   0.75   0.02   SKID_METAL  SPARKS
+WOOD          0.88   0.82   0.72   0.03   SKID_WOOD   WOOD_SPLINTER
+WATER_SURF    0.50   0.45   0.40   0.35   NONE        WATER_SPLASH

@@ -1,0 +1,16 @@
+; Leonidas Vice City Stories - Tactical Weapons Overhaul
+; Weapon ballistic properties calibrated for precision PC mouse aim
+; Name FireType TargetRange FireRate Accuracy Damage AmmoPerClip MuzzleVel
+PISTOL           MELEE     65.0      320       0.88      35       7         420.0
+PYTHON           MELEE     85.0      550       0.94     110       6         580.0
+SHOTGUN          MELEE     45.0      850       0.75      80       1         380.0
+SPAS12           MELEE     50.0      480       0.78      95       7         410.0
+UZI              MELEE     70.0      110       0.82      24      30         450.0
+MP5              MELEE     80.0      125       0.89      32      30         520.0
+M4               MELEE    140.0      135       0.92      48      50         780.0
+AK47             MELEE    130.0      150       0.88      52      30         720.0
+SNIPER           MELEE    350.0     1100       0.99     180       1        1150.0
+LASER_SNIPER     MELEE    400.0      900       1.00     220       7        1250.0
+M60              MELEE    160.0      140       0.84      65     100         820.0
+MINIGUN          MELEE    180.0       60       0.80      75     500         950.0
+ROCKET           PROJECT  250.0     1500       0.95     400       1         180.0
