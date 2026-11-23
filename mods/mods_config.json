@@ -12,6 +12,7 @@
     "60fps_physics_and_timing": true,
     "tactical_weapons_overhaul": true,
     "extended_draw_distance": true,
-    "retro_synthwave_radio_enhancer": true
+    "retro_synthwave_radio_enhancer": true,
+    "hd_textures_overhaul": true
   }
 }
