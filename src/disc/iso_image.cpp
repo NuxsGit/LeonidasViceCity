@@ -137,6 +137,57 @@ namespace vcs
         return true;
     }
 
+    bool IsoImage::openFd(int fd)
+    {
+        close();
+#if defined(_WIN32)
+        (void)fd;
+        m_error = "openFd not supported on Windows";
+        return false;
+#else
+        if (fd < 0)
+        {
+            m_error = "invalid descriptor";
+            return false;
+        }
+        struct stat st{};
+        if (fstat(fd, &st) != 0)
+        {
+            m_error = "fstat failed on descriptor";
+            return false;
+        }
+        void *view = mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        if (view == MAP_FAILED)
+        {
+            m_error = "cannot map descriptor";
+            return false;
+        }
+        m_data = static_cast<const uint8_t *>(view);
+        m_size = static_cast<uint64_t>(st.st_size);
+
+        if (m_size < 17 * kSectorSize)
+        {
+            m_error = "image too small";
+            close();
+            return false;
+        }
+        const uint8_t *pvd = m_data + 16 * kSectorSize;
+        if (pvd[0] != 1 || std::memcmp(pvd + 1, "CD001", 5) != 0)
+        {
+            m_error = "not an ISO 9660 image";
+            close();
+            return false;
+        }
+        const uint8_t *root = pvd + 156;
+        if (!indexDirectory(le32(root + 2), le32(root + 10), "", 0))
+        {
+            close();
+            return false;
+        }
+        return true;
+#endif
+    }
+
     bool IsoImage::indexDirectory(uint32_t lba, uint32_t size, const std::string &prefix, int depth)
     {
         if (depth > 16 || uint64_t(lba) * kSectorSize + size > m_size)

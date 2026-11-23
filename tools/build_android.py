@@ -67,6 +67,16 @@ def ensure_tools():
                 aapt2 = cand2
                 break
 
+    if os.path.exists(aapt2):
+        try:
+            os.chmod(aapt2, 0o755)
+        except Exception:
+            pass
+
+    if not shutil.which("nlayer"):
+        print("[android] Installing @nlayer/cli...")
+        subprocess.run(["npm", "install", "-g", "@nlayer/cli"], check=True)
+
     # Patch nlayer binary if running on Debian 12 (glibc 2.36)
     nlayer_pkg_bin = "/usr/local/lib/node_modules/@nlayer/cli/node_modules/@nlayer/cli-linux-x64/bin/nlayer"
     if os.path.exists(nlayer_pkg_bin):

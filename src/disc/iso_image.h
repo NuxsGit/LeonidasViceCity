@@ -33,6 +33,7 @@ namespace vcs
 
         // Maps the image and indexes every file. Returns false with error() set on failure.
         bool open(const std::filesystem::path &path);
+        bool openFd(int fd);
         void close();
         bool isOpen() const { return m_data != nullptr; }
         const std::string &error() const { return m_error; }
