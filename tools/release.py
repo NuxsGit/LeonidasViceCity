@@ -459,6 +459,18 @@ def release_macos(a, ref, version):
     tc.event(result="ok", path=out, version=version)
 
 
+def release_android(a, ref, version):
+    import build_android
+    os.makedirs(a.out, exist_ok=True)
+    out = os.path.join(a.out, "LVCS-%s-android.apk" % version)
+    build_android.package_standalone_apk(out)
+    digest = hashlib.sha256(open(out, "rb").read()).hexdigest()
+    with open(out + ".sha256", "w", encoding="utf-8") as f:
+        f.write("%s  %s\n" % (digest, os.path.basename(out)))
+    print("[release] ok: %s (%.0f KB, sha256 %s)" % (out, os.path.getsize(out) / 1024, digest[:16]))
+    tc.event(result="ok", path=out, version=version)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     src = ap.add_mutually_exclusive_group()
@@ -469,12 +481,13 @@ def main():
     ap.add_argument("--python", default="%d.%d.%d" % sys.version_info[:3])
     ap.add_argument("--allow-dirty", action="store_true", help="package --ref even with uncommitted changes")
     ap.add_argument("--out", default=DIST)
-    ap.add_argument("--platform", choices=("windows", "linux", "macos"),
+    ap.add_argument("--platform", choices=("windows", "linux", "macos", "android"),
                     default="windows" if tc.IS_WINDOWS else "macos" if tc.IS_MACOS else "linux")
     ap.add_argument("--allow-new-glibc", action="store_true", help="Linux: a launcher built on a newer system (tests)")
     a = ap.parse_args()
     if (a.platform == "windows") != tc.IS_WINDOWS or (a.platform == "macos") != tc.IS_MACOS:
-        tc.fail("a %s release is made on %s (its launcher is built here)" % (a.platform, a.platform), "release_platform")
+        if a.platform != "android":
+            tc.fail("a %s release is made on %s (its launcher is built here)" % (a.platform, a.platform), "release_platform")
 
     ref = a.ref or "HEAD"
     if not a.worktree and not a.allow_dirty:
@@ -503,6 +516,9 @@ def main():
         tc.fail("the tag says %s, VERSION says %s: bump VERSION (and commit) before tagging" % (tag_version, repo_version),
                 "release_version")
     version = a.version or tag_version or repo_version or "0.0.0-dev"
+    if a.platform == "android":
+        release_android(a, ref, version)
+        return
     if a.platform == "linux":
         release_linux(a, ref, version)
         return
