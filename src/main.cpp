@@ -381,17 +381,15 @@ namespace
         std::fprintf(stderr, "[settings] preset %s\n", name);
     }
 
-    const Preset kAuthenticTiming[] = {{"display.timing", 0}, {"display.fps", 30}};
+    const Preset kAuthentic[] = {{"display.aspect", 43}, {"display.hud", 0}, {"display.cutscene_bars", 1},
+                                 {"display.scale", 1},   {"display.msaa", 1}, {"display.aniso", 0},
+                                 {"display.timing", 0},  {"display.fps", 30}, {"display.vsync", kVsyncDefault},
+                                 {"enhance.traffic", 100}, {"enhance.peds", 100}, {"enhance.draw_distance", 100}};
 
     void applyAuthentic()
     {
-        for (const char *key : kPresetKeys)
-            for (const settings::Spec &s : settings::all())
-                if (s.key == key)
-                    settings::set(s.key, s.defaultValue);
-        for (const Preset &p : kAuthenticTiming)
-            settings::set(p.key, p.value);
-        std::fprintf(stderr, "[settings] preset Authentic\n");
+        applyPreset("Authentic", kAuthentic);
+        setEnv("LEONIDAS_POSTFX", "0");
     }
 
     // Each host frame: the frame-rate counter (Display > Show frame rate) - game frames per second, measured over half
@@ -547,8 +545,8 @@ namespace
                  "is 853x448), or at the window's own resolution (sharpest; the effects keep the original's look). "
                  "Costs GPU time.";
         s.type = Type::Choice;
-        s.choices = {{"1x (original)", 1}, {"2x", 2}, {"3x", 3}, {"4x", 4}, {"6x", 6}, {"8x", 8}, {"Match window", 0}};
-        s.defaultValue = 1;
+        s.choices = {{"1x (original)", 1}, {"2x", 2}, {"3x", 3}, {"4x (HD Remake)", 4}, {"6x", 6}, {"8x (4K UHD)", 8}, {"Match window", 0}};
+        s.defaultValue = 4;
         s.apply = Apply::Restart;
         s.env = "PS2X_HW_SCALE";
         s.onChange = [](int v) { setEnv("PS2X_HW_SCALE", std::to_string(v)); }; // read when the renderer starts
@@ -699,8 +697,8 @@ namespace
         s.label = "Anti-aliasing (MSAA)";
         s.help = "Smooths the edges of the 3D picture. Off is the original. Costs GPU time.";
         s.type = Type::Choice;
-        s.choices = {{"Off (original)", 1}, {"2x", 2}, {"4x", 4}, {"8x", 8}};
-        s.defaultValue = 1;
+        s.choices = {{"Off (original)", 1}, {"2x", 2}, {"4x (HD Remake)", 4}, {"8x", 8}};
+        s.defaultValue = 4;
         s.apply = Apply::Restart;
         s.env = "PS2X_HW_MSAA";
         s.onChange = [](int v) { setEnv("PS2X_HW_MSAA", std::to_string(v)); };
@@ -715,8 +713,8 @@ namespace
                  "original bilinear filtering.";
         s.type = Type::Choice;
         s.choices = {{"Bilinear (original)", 0}, {"Anisotropic 2x", 2}, {"Anisotropic 4x", 4}, {"Anisotropic 8x", 8},
-                     {"Anisotropic 16x", 16}};
-        s.defaultValue = 0;
+                     {"Anisotropic 16x (HD Remake)", 16}};
+        s.defaultValue = 16;
         s.apply = Apply::Restart;
         s.env = "PS2X_HW_ANISO";
         s.onChange = [](int v) { setEnv("PS2X_HW_ANISO", std::to_string(v)); };
@@ -789,7 +787,18 @@ namespace
         s.help = "Toggles the overall HD Remake experience: active mod virtual filesystem, enhanced visuals, and atmosphere.";
         s.type = Type::Toggle;
         s.defaultValue = 1;
-        s.onChange = [](int v) { vcs::mods::ModManager::instance().applyHdRemakePreset(v != 0); };
+        s.onChange = [](int v) {
+            vcs::mods::ModManager::instance().applyHdRemakePreset(v != 0);
+            if (v != 0)
+            {
+                applyPreset("LVCS HD Remake", kHdRemake);
+                setEnv("LEONIDAS_POSTFX", "1");
+            }
+            else
+            {
+                applyAuthentic();
+            }
+        };
         settings::add(s);
 
         s = {};
@@ -996,6 +1005,18 @@ int main(int argc, char *argv[])
         // Initialize Leonidas ViceCityStories (LVCS) Mod Manager and HD Textures
         vcs::mods::ModManager::instance().initialize(exeDirectory() / "mods");
         vcs::mods::HdTextureManager::instance().initialize(vcs::mods::ModManager::instance().modsPath());
+
+        // Ensure HD Remake high-resolution visuals are applied when HD Remake mode is active
+        if (vcs::mods::ModManager::instance().isHdRemakeActive())
+        {
+            if (settings::value("display.scale") <= 1)
+                settings::set("display.scale", 4);
+            if (settings::value("display.msaa") <= 1)
+                settings::set("display.msaa", 4);
+            if (settings::value("display.aniso") <= 0)
+                settings::set("display.aniso", 16);
+            setEnv("LEONIDAS_POSTFX", "1");
+        }
 
         LvcsModDisc disc(iso, vcs::mods::ModManager::instance());
         ps2_disc::setImage(&disc);

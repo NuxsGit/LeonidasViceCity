@@ -3144,7 +3144,7 @@ void PS2Runtime::run()
     ThreadNaming::SetCurrentThreadName("MainThread"); // [gta-recomp] window, presenting, the HW backend's frames (VCS_PROFILE_THREAD)
 
     // A blank image to use as a framebuffer
-    present::Picture frameTex = present::createPicture(FB_WIDTH, FB_HEIGHT, false);
+    present::Picture frameTex = present::createPicture(FB_WIDTH, FB_HEIGHT, true);
     {
         const std::vector<uint32_t> blank(static_cast<size_t>(FB_WIDTH) * FB_HEIGHT, 0u);
         present::updatePicture(frameTex, blank.data());

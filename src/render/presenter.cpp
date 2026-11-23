@@ -88,7 +88,7 @@ namespace present
             g_device->updateBuffer(*g_params, &params, sizeof(params));
             g_device->setPipeline(*g_pipeline);
             g_device->setConstants(0, *g_params);
-            g_device->setTexture(0, picture.texture.get(), picture.linear ? g_linear.get() : g_nearest.get());
+            g_device->setTexture(0, picture.texture.get(), (picture.linear || usePostFx) ? g_linear.get() : g_nearest.get());
             g_device->draw(4);
             g_device->setTexture(0, nullptr, nullptr);
         }

@@ -793,6 +793,13 @@ namespace launcher
         options.cwd = build;
         options.outputFile = gameLog;
         options.killOnClose = false; // the game plays on when the launcher closes
+        if (hdRemakePreset)
+        {
+            options.env.push_back({"PS2X_HW_SCALE", "4"});
+            options.env.push_back({"PS2X_HW_MSAA", "4"});
+            options.env.push_back({"PS2X_HW_ANISO", "16"});
+            options.env.push_back({"LEONIDAS_POSTFX", "1"});
+        }
         game = std::make_unique<Process>();
         if (!game->start({pathText(exe), pathText(iso)}, options, error))
         {
@@ -1097,5 +1104,41 @@ namespace launcher
             out << "  }\n";
             out << "}\n";
         }
+
+        // Sync graphics settings into build/vcs.ini
+        const fs::path ini = build / "vcs.ini";
+        std::vector<std::string> lines;
+        {
+            std::ifstream in(ini);
+            std::string line;
+            while (std::getline(in, line))
+            {
+                if (line.rfind("display.scale=", 0) != 0 &&
+                    line.rfind("display.msaa=", 0) != 0 &&
+                    line.rfind("display.aniso=", 0) != 0 &&
+                    line.rfind("display.aspect=", 0) != 0 &&
+                    line.rfind("display.hud=", 0) != 0)
+                {
+                    lines.push_back(line);
+                }
+            }
+        }
+        if (enable)
+        {
+            lines.push_back("display.scale=4");
+            lines.push_back("display.msaa=4");
+            lines.push_back("display.aniso=16");
+            lines.push_back("display.aspect=0");
+            lines.push_back("display.hud=2");
+        }
+        else
+        {
+            lines.push_back("display.scale=1");
+            lines.push_back("display.msaa=1");
+            lines.push_back("display.aniso=0");
+        }
+        std::ofstream iniOut(ini, std::ios::trunc | std::ios::binary);
+        for (const auto &l : lines)
+            iniOut << (l.empty() || l.back() != '\r' ? l : l.substr(0, l.size() - 1)) << "\n";
     }
 }
