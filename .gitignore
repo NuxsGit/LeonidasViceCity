@@ -42,4 +42,6 @@ __pycache__/
 android/keystore/
 android/runtime/
 android/sdk/
+launcher_app/.nlayer/
+
 

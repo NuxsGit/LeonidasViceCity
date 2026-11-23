@@ -1,0 +1,13 @@
+{
+  "name": "app",
+  "private": true,
+  "dependencies": {
+    "@nlayer/globals": "0.10.0",
+    "@nlayer/jsx-runtime": "0.10.0",
+    "@nlayer/runtime": "0.10.0",
+    "@nlayer/ui": "0.10.0"
+  },
+  "devDependencies": {
+    "@nlayer/test": "0.10.0"
+  }
+}

@@ -48,17 +48,46 @@ def build_with_gradle(out_apk, debug=True):
     return False
 
 def ensure_tools():
-    """Ensure aapt2 and android.jar are available."""
+    """Ensure aapt2, nlayer, and android.jar are available."""
     aapt2 = shutil.which("aapt2") or "/usr/local/bin/aapt2"
     if not (os.path.exists(aapt2) and os.access(aapt2, os.X_OK)):
         print("[android] Installing aapt2...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "aapt2"], check=True)
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", "aapt2", "--break-system-packages"], check=True)
+        except Exception:
+            subprocess.run([sys.executable, "-m", "pip", "install", "aapt2"], check=True)
         import site
         for sp in site.getsitepackages() + [site.getusersitepackages()]:
-            cand = os.path.join(sp, "aapt2", "bin", "aapt2")
+            cand = os.path.join(sp, "aapt2", "bin", "Linux", "aapt2")
             if os.path.exists(cand):
                 aapt2 = cand
                 break
+            cand2 = os.path.join(sp, "aapt2", "bin", "aapt2")
+            if os.path.exists(cand2):
+                aapt2 = cand2
+                break
+
+    # Patch nlayer binary if running on Debian 12 (glibc 2.36)
+    nlayer_pkg_bin = "/usr/local/lib/node_modules/@nlayer/cli/node_modules/@nlayer/cli-linux-x64/bin/nlayer"
+    if os.path.exists(nlayer_pkg_bin):
+        try:
+            with open(nlayer_pkg_bin, "rb") as f:
+                content = f.read()
+            if b"GLIBC_2.39" in content:
+                print("[android] Patching nlayer binary for host glibc compatibility...")
+                content = content.replace(b"GLIBC_2.39", b"GLIBC_2.36")
+                content = content.replace(b"\xb9\x91\x96\x06", b"\xb6\x91\x96\x06")
+                with open(nlayer_pkg_bin, "wb") as f:
+                    f.write(content)
+                os.chmod(nlayer_pkg_bin, 0o755)
+        except Exception as e:
+            print(f"[android] Warning while patching nlayer: {e}")
+
+    # Ensure apk_sign_ts is available
+    res = subprocess.run(["node", "-e", "require('apk_sign_ts')"], env=dict(os.environ, NODE_PATH="/usr/local/lib/node_modules"), capture_output=True)
+    if res.returncode != 0:
+        print("[android] Installing apk_sign_ts...")
+        subprocess.run(["npm", "install", "-g", "apk_sign_ts"], check=True)
 
     android_jar = os.path.join(ANDROID_DIR, "sdk", "android.jar")
     if not os.path.exists(android_jar):
@@ -67,11 +96,11 @@ def ensure_tools():
         tar_path = "/tmp/android-jar.tar.gz"
         subprocess.run([
             "curl", "-sL",
-            "https://codeload.github.com/JetpackDuba/android-jar-with-hidden-api/tar.gz/refs/tags/29",
+            "https://codeload.github.com/JetpackDuba/android-jar-with-hidden-api/tar.gz/refs/heads/master",
             "-o", tar_path
         ], check=True)
         subprocess.run(["tar", "-xzf", tar_path, "-C", "/tmp/"], check=True)
-        src_jar = "/tmp/android-jar-with-hidden-api-29/android.jar"
+        src_jar = "/tmp/android-jar-with-hidden-api-master/android-10/android.jar"
         if os.path.exists(src_jar):
             shutil.copy2(src_jar, android_jar)
 
@@ -212,8 +241,14 @@ def package_standalone_apk(out_apk):
             "--auto-add-overlay"
         ], check=True)
 
-        # 3. Add classes.dex and native libraries into the package
-        print("[android] Adding DEX bytecode and native runtime libraries...")
+        # 3. Build JS app bundle and add assets, classes.dex and native libraries
+        print("[android] Building Launcher App bundle (App.tsx -> bundle.js)...")
+        app_dir = os.path.join(ROOT, "launcher_app")
+        bundle_path = os.path.join(app_dir, ".nlayer", "out", "bundle.js")
+        if os.path.exists(os.path.join(app_dir, "App.tsx")):
+            subprocess.run(["nlayer", "build"], cwd=app_dir, check=True)
+
+        print("[android] Adding application bundle, DEX bytecode and native runtime libraries...")
         unsigned_apk = os.path.join(staging_dir, "unsigned.apk")
         shutil.copy2(base_apk, unsigned_apk)
 
@@ -230,6 +265,11 @@ def package_standalone_apk(out_apk):
         lib_dir = next((p for p in lib_candidates if os.path.isdir(p)), None)
 
         with zipfile.ZipFile(unsigned_apk, "a", compression=zipfile.ZIP_DEFLATED) as z:
+            if os.path.exists(bundle_path):
+                z.write(bundle_path, "assets/app.js")
+                z.write(bundle_path, "app.js")
+            if os.path.exists(macca_icon):
+                z.write(macca_icon, "assets/mascot_macca.png")
             if dex_path:
                 z.write(dex_path, "classes.dex")
             if lib_dir:
