@@ -126,21 +126,31 @@ def fetch(out_dir, platform=None):
             _remove_tree(target)
         archive = ARCHIVES.get(dep["name"].lower())
         if archive:
-            url = archive.format(tag=dep["tag"])
-            print("[deps] %s %s (%s)" % (dep["name"], dep["tag"], url))
-            tmp = target + ".tar.xz"
-            download(url, tmp)
-            with tarfile.open(tmp) as t:
-                if hasattr(tarfile, "data_filter"):  # Python 3.12 / backports; macOS' own python3 is 3.9
-                    t.extractall(target + ".x", filter="data")
-                else:
-                    t.extractall(target + ".x")
-            os.remove(tmp)
-            inner = os.listdir(target + ".x")  # the archive holds one folder
-            _move(os.path.join(target + ".x", inner[0]) if len(inner) == 1 else target + ".x", target)
-            if os.path.isdir(target + ".x"):
-                _remove_tree(target + ".x")
-            continue
+            try:
+                url = archive.format(tag=dep["tag"])
+                print("[deps] %s %s (%s)" % (dep["name"], dep["tag"], url))
+                tmp = target + ".tar.xz"
+                download(url, tmp)
+                with tarfile.open(tmp) as t:
+                    if hasattr(tarfile, "data_filter"):  # Python 3.12 / backports; macOS' own python3 is 3.9
+                        t.extractall(target + ".x", filter="data")
+                    else:
+                        t.extractall(target + ".x")
+                os.remove(tmp)
+                inner = os.listdir(target + ".x")  # the archive holds one folder
+                _move(os.path.join(target + ".x", inner[0]) if len(inner) == 1 else target + ".x", target)
+                if os.path.isdir(target + ".x"):
+                    _remove_tree(target + ".x")
+                continue
+            except Exception as e:
+                print("[deps] archive download failed (%s), falling back to git clone..." % e)
+                if os.path.exists(tmp):
+                    try:
+                        os.remove(tmp)
+                    except OSError:
+                        pass
+                if os.path.isdir(target + ".x"):
+                    _remove_tree(target + ".x")
         print("[deps] %s %s (%s)" % (dep["name"], dep["tag"], dep["repo"]))
         cmd = ["git", "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1", "--branch", dep["tag"],
                dep["repo"], target]
