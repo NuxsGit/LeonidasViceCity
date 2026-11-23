@@ -45,48 +45,141 @@ def build_with_gradle(out_apk, debug=True):
     return False
 
 def package_standalone_apk(out_apk):
-    """Packages a ready-to-deploy APK archive containing launcher assets, manifest, and icons."""
+    """Packages a ready-to-deploy, fully compliant and signed APK archive."""
     print(f"[android] Packaging standalone Android Launcher APK: {out_apk}...")
     os.makedirs(os.path.dirname(os.path.abspath(out_apk)), exist_ok=True)
 
-    manifest_xml = os.path.join(ANDROID_DIR, "app", "src", "main", "AndroidManifest.xml")
+    keystore_dir = os.path.join(ANDROID_DIR, "keystore")
+    os.makedirs(keystore_dir, exist_ok=True)
+    key_path = os.path.join(keystore_dir, "debug.key")
+    crt_path = os.path.join(keystore_dir, "debug.crt")
+
+    if not os.path.exists(key_path) or not os.path.exists(crt_path):
+        print("[android] Generating Android signing key and certificate...")
+        subprocess.run([
+            "openssl", "req", "-x509", "-newkey", "rsa:2048",
+            "-keyout", key_path, "-out", crt_path,
+            "-days", "10000", "-nodes",
+            "-subj", "/CN=LeonidasViceCity/O=Leonidas/C=US"
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    manifest_xml = """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.leonidas.vicecity"
+    android:versionCode="450"
+    android:versionName="0.4.5">
+
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <uses-feature android:glEsVersion="0x00030002" android:required="true" />
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="0x401000" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+
+    <application
+        android:label="Leonidas Vice City"
+        android:hasCode="true"
+        android:allowBackup="true"
+        android:supportsRtl="true"
+        android:extractNativeLibs="true">
+
+        <activity
+            android:name="dev.nlayer.android.HostActivity"
+            android:label="Leonidas Vice City"
+            android:exported="true"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.GAME" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.leonidas.vicecity.MainActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
+
+        <activity
+            android:name="com.leonidas.vicecity.GameActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
+
+    </application>
+</manifest>
+"""
+
+    import pyaxml
+    doc = pyaxml.AXML()
+    doc.from_xml(manifest_xml)
+    doc.compute()
+    axml_bytes = doc.pack()
+
+    unsigned_apk = out_apk + ".unsigned.tmp"
     macca_icon = os.path.join(ROOT, "launcher", "launcher.png")
-    res_dir = os.path.join(ANDROID_DIR, "app", "src", "main", "res")
 
-    with zipfile.ZipFile(out_apk, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        # 1. AndroidManifest.xml
-        if os.path.exists(manifest_xml):
-            z.write(manifest_xml, "AndroidManifest.xml")
+    with zipfile.ZipFile(unsigned_apk, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        # 1. Binary AndroidManifest.xml (AXML format)
+        z.writestr("AndroidManifest.xml", axml_bytes)
 
-        # 2. Launcher Icon (Macca without background)
-        added_files = set()
+        # 2. Classes DEX
+        dex_path = "/usr/local/lib/node_modules/@nlayer/runtime-android/runtime/android/classes.dex"
+        if os.path.exists(dex_path):
+            z.write(dex_path, "classes.dex")
+
+        # 3. Native Libraries (.so)
+        lib_dir = "/usr/local/lib/node_modules/@nlayer/runtime-android/runtime/android/lib"
+        if os.path.isdir(lib_dir):
+            for root_dir, _, files in os.walk(lib_dir):
+                for f in files:
+                    full_p = os.path.join(root_dir, f)
+                    rel_p = os.path.relpath(full_p, os.path.dirname(lib_dir))
+                    z.write(full_p, rel_p)
+
+        # 4. Icon resources
         if os.path.exists(macca_icon):
+            z.write(macca_icon, "res/drawable/ic_launcher.png")
             z.write(macca_icon, "res/mipmap-xxxhdpi/ic_launcher.png")
             z.write(macca_icon, "res/drawable/mascot_macca.png")
-            added_files.add("res/mipmap-xxxhdpi/ic_launcher.png")
-            added_files.add("res/drawable/mascot_macca.png")
 
-        # 3. Add resources
-        for root_dir, _, files in os.walk(res_dir):
-            for f in files:
-                full_path = os.path.join(root_dir, f)
-                rel_path = os.path.relpath(full_path, os.path.join(ANDROID_DIR, "app", "src", "main"))
-                if rel_path not in added_files:
-                    z.write(full_path, rel_path)
-                    added_files.add(rel_path)
+    # 5. Sign APK with APK Signature Scheme v1, v2, v3
+    print("[android] Signing APK with v1 + v2 + v3 schemes...")
+    js_code = f"""
+    const fs = require('fs');
+    const {{ ApkSigner, SigningKey }} = require('apk_sign_ts');
 
-        # 4. Add Android source metadata & APK identification
-        apk_meta = (
-            "Package: com.leonidas.vicecity\n"
-            "VersionCode: 450\n"
-            "VersionName: 0.4.5\n"
-            "ApplicationName: Leonidas Vice City Stories\n"
-            "Features: ROM Selector, Virtual Touchscreen Gamepad, HD Remake Engine\n"
-        )
-        z.writestr("META-INF/LEONIDAS.SF", apk_meta)
-        z.writestr("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\nCreated-By: Leonidas ViceCity Engine\n")
+    async function run() {{
+        const privateKey = fs.readFileSync('{os.path.abspath(key_path)}', 'utf8');
+        const certificate = fs.readFileSync('{os.path.abspath(crt_path)}', 'utf8');
+        const key = SigningKey.fromPEM(privateKey, certificate);
+        const apkBytes = new Uint8Array(fs.readFileSync('{os.path.abspath(unsigned_apk)}'));
+        const signer = new ApkSigner({{ signingKey: key }});
+        const {{ signedApk }} = await signer.sign(apkBytes);
+        fs.writeFileSync('{os.path.abspath(out_apk)}', signedApk);
+    }}
+    run().catch(err => {{ console.error(err); process.exit(1); }});
+    """
 
-    print(f"[android] APK packaged successfully: {out_apk} ({os.path.getsize(out_apk)} bytes)")
+    env = dict(os.environ, NODE_PATH="/usr/local/lib/node_modules")
+    res = subprocess.run(["node", "-e", js_code], env=env, capture_output=True, text=True)
+    if os.path.exists(unsigned_apk):
+        try:
+            os.remove(unsigned_apk)
+        except OSError:
+            pass
+
+    if res.returncode != 0:
+        raise RuntimeError(f"APK signing failed: {res.stderr}")
+
+    print(f"[android] Signed APK successfully created: {out_apk} ({os.path.getsize(out_apk)} bytes)")
     return True
 
 def main():
