@@ -1,0 +1,11 @@
+{
+  "id": "tactical_weapons_overhaul",
+  "name": "Tactical Weapons Overhaul & Ballistics",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Gameplay",
+  "description": "Comprehensive gunplay rebalancing tuned for mouse precision: realistic bullet velocity, adjusted recoil patterns, authentic weapon ranges, progressive damage falloff, and enhanced impact force.",
+  "enabled": true,
+  "priority": 75,
+  "tags": ["weapons", "ballistics", "gunplay", "mouse-aim", "damage"]
+}

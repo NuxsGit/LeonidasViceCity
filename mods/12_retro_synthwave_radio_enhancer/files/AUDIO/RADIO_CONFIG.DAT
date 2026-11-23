@@ -1,0 +1,10 @@
+; Leonidas Vice City Stories - Retro Synthwave Radio Acoustics & EQ Profile
+; StationId Gain BassBoost TrebleBoost SpatialRadius DynamicRange
+WAVE103      1.15   +3.5dB    +2.0dB      45.0m         HIGH
+FLASH_FM     1.15   +3.0dB    +2.5dB      45.0m         HIGH
+EMOTION      1.10   +2.5dB    +1.5dB      40.0m         WIDE
+VROCK        1.20   +4.0dB    +3.0dB      50.0m         HIGH
+PARADISE     1.12   +3.0dB    +2.0dB      42.0m         WIDE
+VCFL         1.10   +2.0dB    +1.5dB      38.0m         STANDARD
+ESPANSO      1.12   +2.8dB    +2.0dB      40.0m         STANDARD
+FRESH_FM     1.15   +4.5dB    +2.5dB      48.0m         HIGH

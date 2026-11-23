@@ -25,8 +25,9 @@ const THEME = {
 };
 
 function App() {
-  // Navigation & Screens (home, recompiler, settings, saves, game)
-  const currentScreen = signal<"home" | "recompiler" | "settings" | "saves" | "game">("home");
+  // Navigation & Screens (home, mods, recompiler, settings, saves, game)
+  const currentScreen = signal<"home" | "mods" | "recompiler" | "settings" | "saves" | "game">("home");
+  const modFilter = signal<string>("ALL");
 
   // Disc & ISO Management
   const romPath = signal("/sdcard/Download/Grand Theft Auto - Vice City Stories.iso");
@@ -34,6 +35,23 @@ function App() {
   const romSize = signal("4.12 GB");
   const isEditingPath = signal(false);
   const customPathInput = signal("");
+
+  // Integrated Mods Registry (12 Mods)
+  const masterHdRemake = signal(true);
+  const modsList = signal([
+    { id: "hd_remake_essentials", name: "Vice City HD Remake Essentials", category: "Visuals", enabled: true, desc: "Crystal clear timecycle, deep neon sunset lighting, high resolution particles and extended draw distance." },
+    { id: "neon_vice_postfx", name: "Neon Vice PostFX & Color Grading", category: "Visuals", enabled: true, desc: "Cinematic synthwave 80s color saturation and vibrant sunset horizon bloom." },
+    { id: "hd_hud_and_ui", name: "High-Definition HUD & Crisp Radar", category: "UI", enabled: true, desc: "Clean vector HUD elements, sharp minimap blips and widescreen radar alignment." },
+    { id: "modern_pc_controls", name: "Modern PC Controls & Mouse Aim", category: "Controls", enabled: true, desc: "True WASD camera steering, raw mouse aim sensitivity and customizable keybinds." },
+    { id: "extreme_city_life", name: "Extreme City Life & Traffic Density", category: "Gameplay", enabled: true, desc: "Quadrupled pedestrian population and realistic Miami vehicle traffic flow." },
+    { id: "universal_gamepad", name: "Universal Gamepad Auto-Configuration", category: "Controls", enabled: true, desc: "Instant plug-and-play SDL mapping for DualShock, Xbox, Switch and generic controllers." },
+    { id: "vcs_hd_remake_ultrawide", name: "Ultrawide 21:9 & 32:9 FOV Correction", category: "Visuals", enabled: true, desc: "Geometric aspect ratio fix eliminating horizontal character and HUD stretching." },
+    { id: "modern_hd_handling", name: "Modern HD Vehicle Handling & Physics", category: "Gameplay", enabled: true, desc: "Responsive steering curves, reduced understeer, tuned suspension, and calibrated motorcycle & boat physics." },
+    { id: "60fps_physics_and_timing", name: "60 FPS Physics & Timing Normalization", category: "Gameplay", enabled: true, desc: "Sub-frame delta time compensation, stabilized surface friction and smooth camera interpolation." },
+    { id: "tactical_weapons_overhaul", name: "Tactical Weapons Overhaul & Ballistics", category: "Gameplay", enabled: true, desc: "Calibrated bullet velocities, authentic weapon ranges, damage falloff and tight mouse-aim gunplay." },
+    { id: "extended_draw_distance", name: "Extended Draw Distance & Horizon LODs", category: "Visuals", enabled: true, desc: "Pushes far clipping plane to 3,200m, rendering distant islands across the bay with atmospheric horizon fog." },
+    { id: "retro_synthwave_radio_enhancer", name: "Retro Synthwave Radio & Audio Dynamics", category: "Audio", enabled: true, desc: "Dynamic range acoustic profile with warm 80s analog curves for Flash FM, Wave 103 and VRock." }
+  ]);
 
   // On-Device Static AOT Recompiler State
   const isRecompiling = signal(false);
@@ -50,7 +68,8 @@ function App() {
     "[iso] Disc mounted: SLUS_215.90 (LBA sectors: 2,108,432)",
     "[mips] EE address space mapped: 0x00100000 -> 0x003A0000",
     "[neon] SIMD vector translator sse2neon active (128-bit)",
-    "[status] Ready to compile Emotion Engine executable on-device"
+    "[vfs] Virtual File System: 12 active mods mounted into cdrom0: overrides",
+    "[status] Ready to compile Emotion Engine executable"
   ]);
 
   // Game Engine & TouchPort HUD State
@@ -95,15 +114,46 @@ function App() {
     { label: "Internal Storage Root", path: "/sdcard/vcs.iso", id: "SLUS-21590" }
   ];
 
+  // Toggle Mod
+  const toggleMod = (id: string) => {
+    const list = modsList().map((m) => {
+      if (m.id === id) {
+        return { ...m, enabled: !m.enabled };
+      }
+      return m;
+    });
+    modsList.set(list);
+  };
+
+  // Toggle Master HD Remake Switch
+  const toggleMasterHd = () => {
+    const next = !masterHdRemake();
+    masterHdRemake.set(next);
+    const list = modsList().map((m) => {
+      if (m.category === "Visuals" || m.category === "UI" || m.category === "Gameplay") {
+        return { ...m, enabled: next };
+      }
+      return m;
+    });
+    modsList.set(list);
+  };
+
+  const activeModsCount = () => modsList().filter((m) => m.enabled).length;
+
+  const filteredMods = () => {
+    if (modFilter() === "ALL") return modsList();
+    return modsList().filter((m) => m.category.toUpperCase() === modFilter());
+  };
+
   // Execute Static AOT Recompilation Pipeline
   const runRecompilationPipeline = (thenLaunch = true) => {
     isRecompiling.set(true);
     recompileProgress.set(8);
-    recompileStage.set("Phase 1/5: Parsing ISO volume descriptor and locating SLUS_215.90...");
+    recompileStage.set("Phase 1/5: Parsing ISO volume descriptor and mounting VFS overrides...");
 
     const l1 = [...recompilerLogs()];
-    l1.push("[recompile] Started on-device static AOT recompilation pipeline");
-    l1.push("[recompile] Accessing ISO through direct mmap file descriptor");
+    l1.push("[recompile] Started static AOT recompilation pipeline");
+    l1.push("[vfs] Applying Virtual File System overrides for 12 active mods");
     recompilerLogs.set(l1);
 
     setTimeout(() => {
@@ -137,7 +187,7 @@ function App() {
             isRecompiling.set(false);
             const l5 = [...recompilerLogs()];
             l5.push("[cache] Execution cache committed: recomp_cache.bin (3.8 MB)");
-            l5.push("[status] Native Leonidas runtime ready for 60 FPS Vulkan execution");
+            l5.push("[status] Native Leonidas runtime ready for 60 FPS execution");
             recompilerLogs.set(l5);
 
             if (thenLaunch) {
@@ -219,6 +269,18 @@ function App() {
             </View>
 
             <View
+              onPress={() => currentScreen.set("mods")}
+              style={{
+                backgroundColor: currentScreen() === "mods" ? THEME.pink : THEME.surface,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 6
+              }}
+            >
+              <Text style={{ color: THEME.text, fontSize: 11, fontWeight: "bold", letterSpacing: 0.5 }}>MODS ({activeModsCount()})</Text>
+            </View>
+
+            <View
               onPress={() => currentScreen.set("recompiler")}
               style={{
                 backgroundColor: currentScreen() === "recompiler" ? THEME.pink : THEME.surface,
@@ -291,7 +353,6 @@ function App() {
                 opacity: 0.95
               }}
             >
-              {/* Sun horizontal laser bands */}
               <View style={{ position: "absolute", top: 35, width: "100%", height: 3, backgroundColor: THEME.sky }} />
               <View style={{ position: "absolute", top: 60, width: "100%", height: 5, backgroundColor: THEME.sky }} />
               <View style={{ position: "absolute", top: 90, width: "100%", height: 7, backgroundColor: THEME.sky }} />
@@ -343,7 +404,7 @@ function App() {
                 Vice City Stories
               </Text>
               <Text style={{ color: THEME.dim, fontSize: 12, marginTop: 4, letterSpacing: 0.3 }}>
-                Portage Mobile HD Remake · Recompilation PS2 AOT · Modding VFS
+                Portage PC HD Remake · Modding VFS · Recompilation PS2 AOT
               </Text>
             </View>
           </View>
@@ -433,13 +494,13 @@ function App() {
                 </Text>
                 <Text style={{ color: "rgba(255, 255, 255, 0.8)", fontSize: 11, marginTop: 4 }}>
                   {isRecompiled()
-                    ? "Static execution cache ready · Vulkan 60 FPS"
-                    : "Direct Emotion Engine MIPS R5900 translation on this device"}
+                    ? `12 mods active · Static execution cache ready · 60 FPS`
+                    : "Direct Emotion Engine MIPS R5900 translation with VFS mods mounted"}
                 </Text>
               </View>
             )}
 
-            {/* Three Quiet Glass Cards matching launcher/screens/home.cpp */}
+            {/* Quiet Glass Cards matching launcher/screens/home.cpp */}
             <View style={{ gap: 10 }}>
               {/* Card 1: Disc / ISO */}
               <View
@@ -480,79 +541,46 @@ function App() {
                 </View>
               </View>
 
-              {/* Path Editor if toggled */}
-              {isEditingPath() && (
+              {/* Card 2: Mods & HD Remake (PC Launcher Sheet Link) */}
+              <View
+                onPress={() => currentScreen.set("mods")}
+                style={{
+                  backgroundColor: THEME.surface,
+                  borderRadius: 10,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: THEME.border,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}
+              >
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <Text style={{ color: THEME.faint, fontSize: 10, fontWeight: "bold", letterSpacing: 1 }}>
+                    MODS & HD REMAKE
+                  </Text>
+                  <Text style={{ color: THEME.text, fontSize: 14, fontWeight: "bold", marginTop: 2 }}>
+                    Integrated Modding Engine (VFS)
+                  </Text>
+                  <Text style={{ color: THEME.dim, fontSize: 11, marginTop: 2 }}>
+                    {activeModsCount()} active of 12 installed · {masterHdRemake() ? "HD Remake active" : "Custom"}
+                  </Text>
+                </View>
                 <View
                   style={{
-                    backgroundColor: THEME.base,
-                    borderRadius: 8,
-                    padding: 12,
+                    backgroundColor: "rgba(237, 30, 121, 0.12)",
                     borderWidth: 1,
-                    borderColor: THEME.borderHi
+                    borderColor: THEME.pink,
+                    borderRadius: 12,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3
                   }}
                 >
-                  <Text style={{ color: THEME.dim, fontSize: 11, fontWeight: "bold", marginBottom: 6 }}>
-                    Manual path or select preset:
-                  </Text>
-                  <Input
-                    value={customPathInput()}
-                    onChangeText={(val) => customPathInput.set(val)}
-                    placeholder="/sdcard/Download/vcs.iso"
-                    style={{
-                      backgroundColor: THEME.surface,
-                      color: THEME.text,
-                      padding: 8,
-                      borderRadius: 6,
-                      fontSize: 11,
-                      borderWidth: 1,
-                      borderColor: THEME.border,
-                      marginBottom: 8
-                    }}
-                  />
-                  <View
-                    onPress={() => {
-                      if (customPathInput().trim()) {
-                        romPath.set(customPathInput().trim());
-                        isEditingPath.set(false);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: THEME.pink,
-                      paddingVertical: 8,
-                      borderRadius: 6,
-                      alignItems: "center",
-                      marginBottom: 8
-                    }}
-                  >
-                    <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "bold" }}>APPLY PATH</Text>
-                  </View>
-
-                  <View style={{ gap: 4 }}>
-                    {presetRoms.map((preset) => (
-                      <View
-                        key={preset.path}
-                        onPress={() => {
-                          romPath.set(preset.path);
-                          romId.set(preset.id);
-                          isEditingPath.set(false);
-                        }}
-                        style={{
-                          backgroundColor: romPath() === preset.path ? "rgba(237, 30, 121, 0.15)" : THEME.surface,
-                          padding: 8,
-                          borderRadius: 6,
-                          borderWidth: 1,
-                          borderColor: romPath() === preset.path ? THEME.pink : THEME.border
-                        }}
-                      >
-                        <Text style={{ color: THEME.text, fontSize: 11, fontWeight: "bold" }}>{preset.label}</Text>
-                        <Text style={{ color: THEME.faint, fontSize: 9 }}>{preset.path}</Text>
-                      </View>
-                    ))}
-                  </View>
+                  <Text style={{ color: THEME.pink, fontSize: 10, fontWeight: "bold" }}>MANAGE ›</Text>
                 </View>
-              )}
+              </View>
 
-              {/* Card 2: Recompiler Engine */}
+              {/* Card 3: Recompiler Engine */}
               <View
                 onPress={() => currentScreen.set("recompiler")}
                 style={{
@@ -593,7 +621,7 @@ function App() {
                 </View>
               </View>
 
-              {/* Card 3: TouchPort Mobile HUD */}
+              {/* Card 4: TouchPort Mobile HUD */}
               <View
                 onPress={() => currentScreen.set("settings")}
                 style={{
@@ -612,7 +640,7 @@ function App() {
                     TOUCHPORT CONTROLS & HUD
                   </Text>
                   <Text style={{ color: THEME.text, fontSize: 14, fontWeight: "bold", marginTop: 2 }}>
-                    On-Screen Responsive Gamepad
+                    Responsive Gamepad
                   </Text>
                   <Text style={{ color: THEME.dim, fontSize: 11, marginTop: 2 }}>
                     Dynamic floating stick · Drag-to-aim · Auto-sprint
@@ -636,7 +664,142 @@ function App() {
       )}
 
       {/* ============================================================== */}
-      {/* SCREEN 2: RECOMPILER DASHBOARD & DIAGNOSTICS                  */}
+      {/* SCREEN 2: MODS & HD REMAKE MANAGER (PC LAUNCHER DRAWER)        */}
+      {/* ============================================================== */}
+      {currentScreen() === "mods" && (
+        <Scroll style={{ flex: 1, padding: 18 }}>
+          {/* Master Switch Card matching launcher/screens/sheets.cpp */}
+          <View
+            onPress={toggleMasterHd}
+            style={{
+              backgroundColor: THEME.surface,
+              borderRadius: 10,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: masterHdRemake() ? THEME.pink : THEME.border,
+              marginBottom: 16,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}
+          >
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ color: THEME.text, fontSize: 15, fontWeight: "bold" }}>
+                LVCS HD Remake Engine
+              </Text>
+              <Text style={{ color: THEME.dim, fontSize: 11, marginTop: 2 }}>
+                Activates 4K textures, 80s neon shaders, extended draw distance, modern physics and full audio overhaul.
+              </Text>
+            </View>
+            <View
+              style={{
+                backgroundColor: masterHdRemake() ? THEME.pink : THEME.base,
+                borderWidth: 1,
+                borderColor: masterHdRemake() ? THEME.pinkHi : THEME.border,
+                borderRadius: 14,
+                paddingHorizontal: 12,
+                paddingVertical: 6
+              }}
+            >
+              <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "bold" }}>
+                {masterHdRemake() ? "ACTIVE" : "OFF"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Category Filter Pills */}
+          <View style={{ flexDirection: "row", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+            {["ALL", "VISUALS", "GAMEPLAY", "CONTROLS", "UI", "AUDIO"].map((cat) => (
+              <View
+                key={cat}
+                onPress={() => modFilter.set(cat)}
+                style={{
+                  backgroundColor: modFilter() === cat ? THEME.pink : THEME.surface,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: modFilter() === cat ? THEME.pinkHi : THEME.border
+                }}
+              >
+                <Text style={{ color: THEME.text, fontSize: 10, fontWeight: "bold", letterSpacing: 0.5 }}>
+                  {cat}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Installed Mods List */}
+          <View style={{ gap: 8, marginBottom: 18 }}>
+            {filteredMods().map((m) => (
+              <View
+                key={m.id}
+                onPress={() => toggleMod(m.id)}
+                style={{
+                  backgroundColor: THEME.surface,
+                  borderRadius: 8,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: m.enabled ? THEME.borderHi : THEME.border,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}
+              >
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                    <Text style={{ color: THEME.text, fontSize: 13, fontWeight: "bold" }}>
+                      {m.name}
+                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: "rgba(41, 171, 226, 0.15)",
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4
+                      }}
+                    >
+                      <Text style={{ color: THEME.teal, fontSize: 9, fontWeight: "bold" }}>
+                        {m.category.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ color: THEME.dim, fontSize: 11, lineHeight: 16 }}>
+                    {m.desc}
+                  </Text>
+                </View>
+
+                {/* Mod Toggle Indicator */}
+                <View
+                  style={{
+                    width: 38,
+                    height: 22,
+                    borderRadius: 11,
+                    backgroundColor: m.enabled ? THEME.pink : THEME.night,
+                    borderWidth: 1,
+                    borderColor: m.enabled ? THEME.pinkHi : THEME.border,
+                    alignItems: m.enabled ? "flex-end" : "flex-start",
+                    justifyContent: "center",
+                    paddingHorizontal: 2
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: 8,
+                      backgroundColor: "#FFFFFF"
+                    }}
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        </Scroll>
+      )}
+
+      {/* ============================================================== */}
+      {/* SCREEN 3: RECOMPILER DASHBOARD & DIAGNOSTICS                  */}
       {/* ============================================================== */}
       {currentScreen() === "recompiler" && (
         <Scroll style={{ flex: 1, padding: 18 }}>
@@ -761,7 +924,7 @@ function App() {
       )}
 
       {/* ============================================================== */}
-      {/* SCREEN 3: GAMEPLAY VIEW & TOUCHPORT HUD                        */}
+      {/* SCREEN 4: GAMEPLAY VIEW & TOUCHPORT HUD                        */}
       {/* ============================================================== */}
       {currentScreen() === "game" && (
         <View style={{ flex: 1, position: "relative" }}>
@@ -1364,7 +1527,7 @@ function App() {
       )}
 
       {/* ============================================================== */}
-      {/* SCREEN 4: SETTINGS & GRAPHICS CONFIGURATION                    */}
+      {/* SCREEN 5: SETTINGS & GRAPHICS CONFIGURATION                    */}
       {/* ============================================================== */}
       {currentScreen() === "settings" && (
         <Scroll style={{ flex: 1, padding: 18 }}>
@@ -1432,7 +1595,7 @@ function App() {
       )}
 
       {/* ============================================================== */}
-      {/* SCREEN 5: SAVES & MEMORY CARD                                  */}
+      {/* SCREEN 6: SAVES & MEMORY CARD                                  */}
       {/* ============================================================== */}
       {currentScreen() === "saves" && (
         <Scroll style={{ flex: 1, padding: 18 }}>

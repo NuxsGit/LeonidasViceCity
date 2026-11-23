@@ -1,0 +1,11 @@
+{
+  "id": "retro_synthwave_radio_enhancer",
+  "name": "Retro Synthwave Radio & Audio Dynamics",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Audio",
+  "description": "High-fidelity audio equalization and acoustic profile tailored for Vice City 80s radio stations (Wave 103, Flash FM, Emotion 98.3, VRock, Paradise): dynamic range expansion, warm analog harmonics, and enhanced 3D environmental soundscapes.",
+  "enabled": true,
+  "priority": 70,
+  "tags": ["audio", "radio", "sound", "synthwave", "acoustics"]
+}

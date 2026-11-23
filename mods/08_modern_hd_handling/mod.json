@@ -1,0 +1,11 @@
+{
+  "id": "modern_hd_handling",
+  "name": "Modern HD Vehicle Handling & Physics",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Gameplay",
+  "description": "Comprehensive handling and suspension overhaul: responsive steering curve, realistic acceleration, reduced understeer, progressive braking, and calibrated motorcycle and boat stability for PC keyboard, mouse, and gamepads.",
+  "enabled": true,
+  "priority": 85,
+  "tags": ["gameplay", "handling", "physics", "vehicles", "pc-controls"]
+}

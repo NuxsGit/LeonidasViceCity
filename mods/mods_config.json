@@ -7,6 +7,11 @@
     "modern_pc_controls": true,
     "extreme_city_life": true,
     "universal_gamepad": true,
-    "vcs_hd_remake_ultrawide": true
+    "vcs_hd_remake_ultrawide": true,
+    "modern_hd_handling": true,
+    "60fps_physics_and_timing": true,
+    "tactical_weapons_overhaul": true,
+    "extended_draw_distance": true,
+    "retro_synthwave_radio_enhancer": true
   }
 }

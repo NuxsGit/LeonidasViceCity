@@ -1,0 +1,11 @@
+{
+  "id": "extended_draw_distance",
+  "name": "Extended Draw Distance & Horizon LODs",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Visuals",
+  "description": "Drastically increases world view distance: pushes back the far clipping plane from 800m to 3,200m, renders distant islands across the bay, enhances neon lights visibility at night, and refines atmospheric horizon fog.",
+  "enabled": true,
+  "priority": 95,
+  "tags": ["graphics", "draw-distance", "lod", "fog", "horizon", "visuals"]
+}
