@@ -78,8 +78,8 @@ def package_standalone_apk(out_apk):
         # 4. Add Android source metadata & APK identification
         apk_meta = (
             "Package: com.leonidas.vicecity\n"
-            "VersionCode: 410\n"
-            "VersionName: 0.4.1\n"
+            "VersionCode: 450\n"
+            "VersionName: 0.4.5\n"
             "ApplicationName: Leonidas Vice City Stories\n"
             "Features: ROM Selector, Virtual Touchscreen Gamepad, HD Remake Engine\n"
         )

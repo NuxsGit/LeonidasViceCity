@@ -5,6 +5,7 @@
 </p>
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-0.4.5-blueviolet.svg)](docs/releases/v0.4.5.md)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-brightgreen.svg)]()
 [![Graphics](https://img.shields.io/badge/Renderer-Direct3D%2011%20%7C%20Vulkan%20%7C%20Metal%20%7C%20GLES-orange.svg)]()
 
