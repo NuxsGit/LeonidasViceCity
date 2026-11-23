@@ -165,6 +165,18 @@ def find_asset(data):
     sha256_info = assets.get(asset_name + ".sha256", {})
     sha256_url = sha256_info.get("browser_download_url", "")
     sha256_api_url = sha256_info.get("url", "")
+
+    # Fallback: check if the release body contains Google Drive or direct download links
+    if not asset_url:
+        body = data.get("body", "")
+        m = re.search(r"https://drive\.google\.com/file/d/([a-zA-Z0-9_-]+)", body)
+        if not m:
+            m = re.search(r"https://drive\.google\.com/uc\?id=([a-zA-Z0-9_-]+)", body)
+        if m:
+            file_id = m.group(1)
+            asset_name = "LeonidasViceCity-PC-HDRemake-%s.zip" % data.get("tag_name", "latest")
+            asset_url = "https://drive.google.com/uc?id=%s&export=download" % file_id
+
     return asset_name, asset_url, asset_api_url, sha256_url, sha256_api_url
 
 

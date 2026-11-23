@@ -18,18 +18,20 @@ Cette version transforme GTA Vice City Stories en un véritable remaster PC haut
 - Système d'exploitation : Windows 10/11 (64 bits) ou Linux (Ubuntu 22.04+ / Arch / Fedora).
 - Carte graphique compatible Vulkan 1.2+ ou DirectX 11/12.
 
-### Sous Windows :
-1. Décompressez l'archive `LeonidasViceCity-PC-HDRemake-v0.4.6.zip`.
-2. Double-cliquez sur `START_GAME_PC.bat` (ou lancez `python tools/run.py "chemin\vers\votre_jeu.iso"`).
-3. Appuyez sur **F2** en cours de jeu pour ouvrir le menu des paramètres HD Remake et ajuster vos préférences graphiques.
+### Lancement avec le Launcher Officiel :
+1. Lancez votre **VCSLauncher.exe** (ou `VCSLauncher` sous Linux).
+2. Cliquez sur le bouton rose **`▶ Play`** pour démarrer le jeu en mode HD Remake.
+3. Accédez aux mods à tout moment via le bouton **Mods** ou la carte **Mods & HD** (13 mods HD Remake pré-activés).
 
-### Sous Linux :
-1. Décompressez l'archive `LeonidasViceCity-PC-HDRemake-v0.4.6.zip`.
-2. Dans un terminal, lancez :
-   ```bash
-   chmod +x START_GAME_PC.sh
-   ./START_GAME_PC.sh /chemin/vers/vcs.iso
-   ```
+### Lancement direct par script :
+- **Sous Windows** : Double-cliquez sur `START_GAME_PC.bat`.
+- **Sous Linux** : Lancez `./START_GAME_PC.sh /chemin/vers/vcs.iso`.
+
+---
+
+## ⚡ Mise à Jour en 1-Clic
+- **Depuis votre Launcher natif** : Cliquez sur la carte **Updates** en bas à droite, puis cliquez sur **"Update now"**. Le launcher télécharge et applique automatiquement la mise à jour en préservant vos réglages et sauvegardes.
+- **En ligne de commande / script** : Double-cliquez sur `MISE_A_JOUR_1CLIC.bat` (ou `./MISE_A_JOUR_1CLIC.sh`).
 
 ---
 
