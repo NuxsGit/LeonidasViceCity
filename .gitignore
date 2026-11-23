@@ -43,5 +43,7 @@ android/keystore/
 android/runtime/
 android/sdk/
 launcher_app/.nlayer/
+tools/bin/
+
 
 
