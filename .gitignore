@@ -23,6 +23,7 @@ out/
 .vs/
 .vscode/
 *.exe
+*.apk
 *.pdb
 *.ilk
 *.exp
