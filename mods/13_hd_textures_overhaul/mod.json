@@ -1,0 +1,11 @@
+{
+  "id": "hd_textures_overhaul",
+  "name": "HD Textures & Surfaces Overhaul",
+  "version": "1.0.0",
+  "author": "Leonidas Team",
+  "category": "Visuals",
+  "description": "High-definition anti-pixel texture replacement pack: seamless 1024x1024 road asphalt, modern sidewalk pavers, crystal ocean water normals, anti-aliased tropical vegetation, and volumetric neon reflection maps.",
+  "enabled": true,
+  "priority": 98,
+  "tags": ["textures", "visuals", "hd", "remaster", "anti-pixel"]
+}

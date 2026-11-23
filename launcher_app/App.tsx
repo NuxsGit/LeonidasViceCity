@@ -50,7 +50,8 @@ function App() {
     { id: "60fps_physics_and_timing", name: "60 FPS Physics & Timing Normalization", category: "Gameplay", enabled: true, desc: "Sub-frame delta time compensation, stabilized surface friction and smooth camera interpolation." },
     { id: "tactical_weapons_overhaul", name: "Tactical Weapons Overhaul & Ballistics", category: "Gameplay", enabled: true, desc: "Calibrated bullet velocities, authentic weapon ranges, damage falloff and tight mouse-aim gunplay." },
     { id: "extended_draw_distance", name: "Extended Draw Distance & Horizon LODs", category: "Visuals", enabled: true, desc: "Pushes far clipping plane to 3,200m, rendering distant islands across the bay with atmospheric horizon fog." },
-    { id: "retro_synthwave_radio_enhancer", name: "Retro Synthwave Radio & Audio Dynamics", category: "Audio", enabled: true, desc: "Dynamic range acoustic profile with warm 80s analog curves for Flash FM, Wave 103 and VRock." }
+    { id: "retro_synthwave_radio_enhancer", name: "Retro Synthwave Radio & Audio Dynamics", category: "Audio", enabled: true, desc: "Dynamic range acoustic profile with warm 80s analog curves for Flash FM, Wave 103 and VRock." },
+    { id: "hd_textures_overhaul", name: "HD Textures & Surfaces Overhaul", category: "Visuals", enabled: true, desc: "Anti-pixel texture pack with seamless 1024x1024 road asphalt, clean pavers, ocean water normals and vegetation." }
   ]);
 
   // On-Device Static AOT Recompiler State
