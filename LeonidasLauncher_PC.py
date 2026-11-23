@@ -204,6 +204,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="badge">v0.4.6 PC</div>
   </div>
 
+  <div class="card" style="border-color: rgba(237, 30, 121, 0.35);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <h2 style="color: #ED1E79; margin-bottom: 0;">Mise à Jour Automatique (1-Clic)</h2>
+      <button onclick="triggerUpdate()" id="updateBtn" style="background: rgba(237,30,121,0.2); border: 1px solid #ED1E79; color: #F8F4F6; padding: 8px 18px; border-radius: 6px; font-weight: 700; cursor: pointer; transition: background 0.2s;">METTRE À JOUR EN 1-CLIC</button>
+    </div>
+    <p style="color: #ADA6AC; font-size: 13px;" id="updateStatus">Vérifie et met à jour instantanément les mods HD, textures retravaillées, shaders et scripts sans perte de vos sauvegardes.</p>
+  </div>
+
   <div class="card">
     <h2>Image Disque (ROM / ISO)</h2>
     <input type="text" id="isoPath" class="iso-input" placeholder="Chemin d'accès ou nom du fichier ISO (ex: ViceCityStories.iso)" value="ViceCityStories.iso">
@@ -275,6 +283,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     await fetch('/api/launch?iso=' + encodeURIComponent(iso));
   }
 
+  async function triggerUpdate() {
+    const btn = document.getElementById('updateBtn');
+    const status = document.getElementById('updateStatus');
+    btn.disabled = true;
+    btn.innerText = "MISE À JOUR EN COURS...";
+    status.innerText = "Recherche des mises à jour sur GitHub et actualisation des fichiers en arrière-plan...";
+    status.style.color = "#29ABE2";
+    await fetch('/api/update');
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerText = "JEU À JOUR !";
+      status.innerText = "Mise à jour terminée avec succès ! Vos mods et scripts sont prêts.";
+      status.style.color = "#00E676";
+      loadMods();
+    }, 3500);
+  }
+
   loadMods();
 </script>
 </body>
@@ -310,6 +335,14 @@ class LauncherHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(b'{"status":"ok"}')
+        elif parsed.path == "/api/update":
+            def do_update():
+                subprocess.run([sys.executable, os.path.join(ROOT, "tools", "one_click_update.py")], cwd=ROOT)
+            threading.Thread(target=do_update, daemon=True).start()
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"status":"updating"}')
         elif parsed.path == "/api/launch":
             qs = urllib.parse.parse_qs(parsed.query)
             iso = qs.get("iso", [""])[0]
