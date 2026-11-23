@@ -18,20 +18,16 @@ Cette version transforme GTA Vice City Stories en un véritable remaster PC haut
 - Système d'exploitation : Windows 10/11 (64 bits) ou Linux (Ubuntu 22.04+ / Arch / Fedora).
 - Carte graphique compatible Vulkan 1.2+ ou DirectX 11/12.
 
-### Lancement avec le Launcher Officiel :
-1. Lancez votre **VCSLauncher.exe** (ou `VCSLauncher` sous Linux).
+### Lancement avec le Launcher C++ Officiel (VCSLauncher.exe) :
+1. Lancez **`VCSLauncher.exe`** (ou `./VCSLauncher` sous Linux).
 2. Cliquez sur le bouton rose **`▶ Play`** pour démarrer le jeu en mode HD Remake.
-3. Accédez aux mods à tout moment via le bouton **Mods** ou la carte **Mods & HD** (13 mods HD Remake pré-activés).
-
-### Lancement direct par script :
-- **Sous Windows** : Double-cliquez sur `START_GAME_PC.bat`.
-- **Sous Linux** : Lancez `./START_GAME_PC.sh /chemin/vers/vcs.iso`.
+3. Accédez aux mods à tout moment via la carte **Mods & HD** (13 mods HD Remake actifs).
 
 ---
 
 ## ⚡ Mise à Jour en 1-Clic
-- **Depuis votre Launcher natif** : Cliquez sur la carte **Updates** en bas à droite, puis cliquez sur **"Update now"**. Le launcher télécharge et applique automatiquement la mise à jour en préservant vos réglages et sauvegardes.
-- **En ligne de commande / script** : Double-cliquez sur `MISE_A_JOUR_1CLIC.bat` (ou `./MISE_A_JOUR_1CLIC.sh`).
+- **Depuis votre Launcher C++ natif** : Cliquez sur la carte **Updates**, puis cliquez sur **"Update now"**. Le launcher télécharge et applique automatiquement la mise à jour sans toucher à vos sauvegardes.
+- **En 1-clic direct** : Double-cliquez sur `MISE_A_JOUR_1CLIC.bat` (ou `./MISE_A_JOUR_1CLIC.sh`).
 
 ---
 

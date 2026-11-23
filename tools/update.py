@@ -31,7 +31,7 @@ import toolchain as tc  # noqa: E402
 
 RELEASE_JSON = os.path.join(tc.ROOT, "RELEASE.json")
 UPDATE_DIR = os.path.join(tc.BUILD, "update")
-KEEP = ("build/", "generated/")  # never replaced or removed
+KEEP = ("build/", "generated/", "VCSLauncher.exe", "VCSLauncher", "python/")  # never replaced or removed
 DEFAULT_REPO = "NuxsGit/LeonidasViceCity"
 ASSET_SUFFIX = "-windows.zip" if tc.IS_WINDOWS else "-macos-arm64.dmg" if tc.IS_MACOS else "-x86_64.AppImage"
 
