@@ -1,11 +1,9 @@
 <resources>
-    <style name="Theme.LeonidasViceCity" parent="Theme.MaterialComponents.NoActionBar">
+    <style name="Theme.LeonidasViceCity" parent="@android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:statusBarColor">@color/bg_dark</item>
         <item name="android:navigationBarColor">@color/bg_dark</item>
         <item name="android:windowBackground">@color/bg_dark</item>
-        <item name="colorPrimary">@color/neon_pink</item>
-        <item name="colorPrimaryVariant">@color/neon_pink_pressed</item>
-        <item name="colorSecondary">@color/neon_cyan</item>
+        <item name="android:colorPrimary">@color/neon_pink</item>
     </style>
 
     <style name="Theme.LeonidasViceCity.Fullscreen" parent="Theme.LeonidasViceCity">

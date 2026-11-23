@@ -3,9 +3,12 @@
 
 Features:
 - Full Android build management (compilation or standalone packaging)
-- ROM / ISO selector integration
-- On-screen touch gamepad mode
-- Macca mascot icon without background
+- Proper AAPT2 binary resource compilation and linking with android.jar
+- RES_XML_RESOURCE_MAP_TYPE chunk generation for full Android package installer compatibility
+- Multi-architecture native libraries (arm64-v8a, armeabi-v7a, x86_64)
+- Touch gamepad overlay and ISO selector integration
+- Macca mascot icon
+- APK Signature Schemes v1, v2, and v3
 
 Usage:
     python tools/build_android.py [--out LeonidasLauncher.apk] [--debug]
@@ -16,7 +19,7 @@ import sys
 import shutil
 import subprocess
 import zipfile
-import zlib
+import tempfile
 import argparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -44,10 +47,42 @@ def build_with_gradle(out_apk, debug=True):
         print(f"[android] Gradle build not available ({e}). Falling back to standalone packaging...")
     return False
 
+def ensure_tools():
+    """Ensure aapt2 and android.jar are available."""
+    aapt2 = shutil.which("aapt2") or "/usr/local/bin/aapt2"
+    if not (os.path.exists(aapt2) and os.access(aapt2, os.X_OK)):
+        print("[android] Installing aapt2...")
+        subprocess.run([sys.executable, "-m", "pip", "install", "aapt2"], check=True)
+        import site
+        for sp in site.getsitepackages() + [site.getusersitepackages()]:
+            cand = os.path.join(sp, "aapt2", "bin", "aapt2")
+            if os.path.exists(cand):
+                aapt2 = cand
+                break
+
+    android_jar = os.path.join(ANDROID_DIR, "sdk", "android.jar")
+    if not os.path.exists(android_jar):
+        print("[android] Downloading android.jar (SDK platform framework)...")
+        os.makedirs(os.path.dirname(android_jar), exist_ok=True)
+        tar_path = "/tmp/android-jar.tar.gz"
+        subprocess.run([
+            "curl", "-sL",
+            "https://codeload.github.com/JetpackDuba/android-jar-with-hidden-api/tar.gz/refs/tags/29",
+            "-o", tar_path
+        ], check=True)
+        subprocess.run(["tar", "-xzf", tar_path, "-C", "/tmp/"], check=True)
+        src_jar = "/tmp/android-jar-with-hidden-api-29/android.jar"
+        if os.path.exists(src_jar):
+            shutil.copy2(src_jar, android_jar)
+
+    return aapt2, android_jar
+
 def package_standalone_apk(out_apk):
     """Packages a ready-to-deploy, fully compliant and signed APK archive."""
     print(f"[android] Packaging standalone Android Launcher APK: {out_apk}...")
     os.makedirs(os.path.dirname(os.path.abspath(out_apk)), exist_ok=True)
+
+    aapt2_bin, android_jar = ensure_tools()
 
     keystore_dir = os.path.join(ANDROID_DIR, "keystore")
     os.makedirs(keystore_dir, exist_ok=True)
@@ -63,7 +98,42 @@ def package_standalone_apk(out_apk):
             "-subj", "/CN=LeonidasViceCity/O=Leonidas/C=US"
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    manifest_xml = """<?xml version="1.0" encoding="utf-8"?>
+    with tempfile.TemporaryDirectory() as staging_dir:
+        res_dir = os.path.join(staging_dir, "res")
+        res_values = os.path.join(res_dir, "values")
+        res_drawable = os.path.join(res_dir, "drawable")
+        res_mipmap = os.path.join(res_dir, "mipmap-xxxhdpi")
+        os.makedirs(res_values, exist_ok=True)
+        os.makedirs(res_drawable, exist_ok=True)
+        os.makedirs(res_mipmap, exist_ok=True)
+
+        strings_xml = os.path.join(res_values, "strings.xml")
+        with open(strings_xml, "w", encoding="utf-8") as f:
+            f.write("""<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Leonidas Vice City</string>
+</resources>""")
+
+        styles_xml = os.path.join(res_values, "styles.xml")
+        with open(styles_xml, "w", encoding="utf-8") as f:
+            f.write("""<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.LeonidasViceCity" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:statusBarColor">#1A1228</item>
+        <item name="android:navigationBarColor">#1A1228</item>
+        <item name="android:windowBackground">#1A1228</item>
+    </style>
+</resources>""")
+
+        macca_icon = os.path.join(ROOT, "launcher", "launcher.png")
+        if os.path.exists(macca_icon):
+            shutil.copy2(macca_icon, os.path.join(res_drawable, "ic_launcher.png"))
+            shutil.copy2(macca_icon, os.path.join(res_mipmap, "ic_launcher.png"))
+            shutil.copy2(macca_icon, os.path.join(res_drawable, "mascot_macca.png"))
+
+        manifest_path = os.path.join(staging_dir, "AndroidManifest.xml")
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            f.write("""<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.leonidas.vicecity"
     android:versionCode="450"
@@ -83,7 +153,10 @@ def package_standalone_apk(out_apk):
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
 
     <application
-        android:label="Leonidas Vice City"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.LeonidasViceCity"
         android:hasCode="true"
         android:allowBackup="true"
         android:supportsRtl="true"
@@ -91,7 +164,8 @@ def package_standalone_apk(out_apk):
 
         <activity
             android:name="dev.nlayer.android.HostActivity"
-            android:label="Leonidas Vice City"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher"
             android:exported="true"
             android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation">
@@ -115,70 +189,86 @@ def package_standalone_apk(out_apk):
 
     </application>
 </manifest>
-"""
+""")
 
-    import pyaxml
-    doc = pyaxml.AXML()
-    doc.from_xml(manifest_xml)
-    doc.compute()
-    axml_bytes = doc.pack()
+        # 1. Compile resources with AAPT2
+        print("[android] Compiling resources with AAPT2...")
+        res_zip = os.path.join(staging_dir, "res.zip")
+        subprocess.run([
+            aapt2_bin, "compile",
+            "--dir", res_dir,
+            "-o", res_zip
+        ], check=True)
 
-    unsigned_apk = out_apk + ".unsigned.tmp"
-    macca_icon = os.path.join(ROOT, "launcher", "launcher.png")
+        # 2. Link APK with AAPT2 against official android.jar
+        print("[android] Linking Android package with AAPT2 (generating AXML with resource map chunk)...")
+        base_apk = os.path.join(staging_dir, "base.apk")
+        subprocess.run([
+            aapt2_bin, "link",
+            "-I", android_jar,
+            "-o", base_apk,
+            "--manifest", manifest_path,
+            res_zip,
+            "--auto-add-overlay"
+        ], check=True)
 
-    with zipfile.ZipFile(unsigned_apk, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        # 1. Binary AndroidManifest.xml (AXML format)
-        z.writestr("AndroidManifest.xml", axml_bytes)
+        # 3. Add classes.dex and native libraries into the package
+        print("[android] Adding DEX bytecode and native runtime libraries...")
+        unsigned_apk = os.path.join(staging_dir, "unsigned.apk")
+        shutil.copy2(base_apk, unsigned_apk)
 
-        # 2. Classes DEX
-        dex_path = "/usr/local/lib/node_modules/@nlayer/runtime-android/runtime/android/classes.dex"
-        if os.path.exists(dex_path):
-            z.write(dex_path, "classes.dex")
+        dex_candidates = [
+            os.path.join(ANDROID_DIR, "runtime", "classes.dex"),
+            "/usr/local/lib/node_modules/@nlayer/runtime-android/runtime/android/classes.dex"
+        ]
+        dex_path = next((p for p in dex_candidates if os.path.exists(p)), None)
 
-        # 3. Native Libraries (.so)
-        lib_dir = "/usr/local/lib/node_modules/@nlayer/runtime-android/runtime/android/lib"
-        if os.path.isdir(lib_dir):
-            for root_dir, _, files in os.walk(lib_dir):
-                for f in files:
-                    full_p = os.path.join(root_dir, f)
-                    rel_p = os.path.relpath(full_p, os.path.dirname(lib_dir))
-                    z.write(full_p, rel_p)
+        lib_candidates = [
+            os.path.join(ANDROID_DIR, "runtime", "lib"),
+            "/usr/local/lib/node_modules/@nlayer/runtime-android/runtime/android/lib"
+        ]
+        lib_dir = next((p for p in lib_candidates if os.path.isdir(p)), None)
 
-        # 4. Icon resources
-        if os.path.exists(macca_icon):
-            z.write(macca_icon, "res/drawable/ic_launcher.png")
-            z.write(macca_icon, "res/mipmap-xxxhdpi/ic_launcher.png")
-            z.write(macca_icon, "res/drawable/mascot_macca.png")
+        with zipfile.ZipFile(unsigned_apk, "a", compression=zipfile.ZIP_DEFLATED) as z:
+            if dex_path:
+                z.write(dex_path, "classes.dex")
+            if lib_dir:
+                for root_dir, _, files in os.walk(lib_dir):
+                    for f in files:
+                        full_p = os.path.join(root_dir, f)
+                        rel_p = os.path.relpath(full_p, os.path.dirname(lib_dir))
+                        z.write(full_p, rel_p)
 
-    # 5. Sign APK with APK Signature Scheme v1, v2, v3
-    print("[android] Signing APK with v1 + v2 + v3 schemes...")
-    js_code = f"""
-    const fs = require('fs');
-    const {{ ApkSigner, SigningKey }} = require('apk_sign_ts');
+        # 4. Sign APK with APK Signature Scheme v1, v2, and v3
+        print("[android] Signing APK with v1 + v2 + v3 schemes (with 4-byte zip alignment)...")
+        js_code = f"""
+        const fs = require('fs');
+        const {{ ApkSigner, SigningKey }} = require('apk_sign_ts');
 
-    async function run() {{
-        const privateKey = fs.readFileSync('{os.path.abspath(key_path)}', 'utf8');
-        const certificate = fs.readFileSync('{os.path.abspath(crt_path)}', 'utf8');
-        const key = SigningKey.fromPEM(privateKey, certificate);
-        const apkBytes = new Uint8Array(fs.readFileSync('{os.path.abspath(unsigned_apk)}'));
-        const signer = new ApkSigner({{ signingKey: key }});
-        const {{ signedApk }} = await signer.sign(apkBytes);
-        fs.writeFileSync('{os.path.abspath(out_apk)}', signedApk);
-    }}
-    run().catch(err => {{ console.error(err); process.exit(1); }});
-    """
+        async function run() {{
+            const privateKey = fs.readFileSync('{os.path.abspath(key_path)}', 'utf8');
+            const certificate = fs.readFileSync('{os.path.abspath(crt_path)}', 'utf8');
+            const key = SigningKey.fromPEM(privateKey, certificate);
+            const apkBytes = new Uint8Array(fs.readFileSync('{unsigned_apk}'));
+            const signer = new ApkSigner({{ signingKey: key }});
+            const {{ signedApk }} = await signer.sign(apkBytes);
+            fs.writeFileSync('{os.path.abspath(out_apk)}', signedApk);
+        }}
+        run().catch(err => {{ console.error(err); process.exit(1); }});
+        """
 
-    env = dict(os.environ, NODE_PATH="/usr/local/lib/node_modules")
-    res = subprocess.run(["node", "-e", js_code], env=env, capture_output=True, text=True)
-    if os.path.exists(unsigned_apk):
-        try:
-            os.remove(unsigned_apk)
-        except OSError:
-            pass
+        env = dict(os.environ, NODE_PATH="/usr/local/lib/node_modules")
+        res = subprocess.run(["node", "-e", js_code], env=env, capture_output=True, text=True)
+        if res.returncode != 0:
+            raise RuntimeError(f"APK signing failed: {res.stderr}")
 
-    if res.returncode != 0:
-        raise RuntimeError(f"APK signing failed: {res.stderr}")
+    # Verify output with AAPT2 dump badging
+    print("[android] Verifying generated APK package...")
+    chk = subprocess.run([aapt2_bin, "dump", "badging", out_apk], capture_output=True, text=True)
+    if chk.returncode != 0:
+        raise RuntimeError(f"APK validation failed: {chk.stderr}")
 
+    print(f"[android] Verification successful! Package info:\n  {chk.stdout.splitlines()[0]}")
     print(f"[android] Signed APK successfully created: {out_apk} ({os.path.getsize(out_apk)} bytes)")
     return True
 
