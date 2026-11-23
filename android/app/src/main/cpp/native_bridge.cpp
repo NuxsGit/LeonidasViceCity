@@ -1,6 +1,8 @@
 // Leonidas Vice City Stories - Android JNI Bridge
 // Connects Android Touch Gamepad Controller and Activity lifecycle to the PS2 native recompiler.
 
+#if defined(__ANDROID__)
+
 #include <jni.h>
 #include <android/log.h>
 #include <android/native_window.h>
@@ -154,3 +156,5 @@ Java_com_leonidas_vicecity_GameActivity_nativeStopEngine(
 }
 
 } // extern "C"
+
+#endif // __ANDROID__
