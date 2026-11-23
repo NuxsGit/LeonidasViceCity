@@ -10,8 +10,8 @@ android {
         applicationId "com.leonidas.vicecity"
         minSdk 24
         targetSdk 34
-        versionCode 410
-        versionName "0.4.1"
+        versionCode 450
+        versionName "0.4.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
