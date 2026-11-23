@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">Leonidas Vice City</string>
+    <string name="launcher_subtitle">Portage Android HD Remake · Moteur Recompilation PS2</string>
+    <string name="play_game">LANCER LE JEU</string>
+    <string name="choose_rom">Choisir la ROM (ISO)</string>
+    <string name="no_rom_selected">Aucune ROM sélectionnée</string>
+    <string name="rom_status_ready">ROM prête : %1$s</string>
+    <string name="settings">Paramètres &amp; Manette</string>
+    <string name="hd_remake_active">Mode Remake HD</string>
+    <string name="hd_remake_desc">Activer les graphismes Vice City HD (4x, MSAA 4x, shaders néon)</string>
+    <string name="touch_controller">Manette Tactile sur l\'écran</string>
+    <string name="touch_controller_desc">Afficher les boutons tactiles et joysticks virtuels</string>
+    <string name="touch_opacity">Opacité de la manette tactile</string>
+    <string name="touch_haptic">Vibrations haptiques</string>
+    <string name="fps_60">Mode 60 FPS fluide</string>
+    <string name="resolution">Résolution interne</string>
+    <string name="close">Fermer</string>
+    <string name="about_title">À propos de Leonidas Vice City Stories</string>
+    <string name="about_desc">Portage natif haute performance avec recompilation statique PS2 pour Android.</string>
+</resources>

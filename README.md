@@ -5,12 +5,12 @@
 </p>
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-brightgreen.svg)]()
-[![Graphics](https://img.shields.io/badge/Renderer-Direct3D%2011%20%7C%20Vulkan%20%7C%20Metal-orange.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-brightgreen.svg)]()
+[![Graphics](https://img.shields.io/badge/Renderer-Direct3D%2011%20%7C%20Vulkan%20%7C%20Metal%20%7C%20GLES-orange.svg)]()
 
-**Leonidas ViceCityStories (LVCS)** est un portage natif sur PC (Windows, Linux et macOS) de **Grand Theft Auto: Vice City Stories** (PS2, USA, SLUS-21590), utilisant la recompilation statique d'exécutable PS2 vers C++ natif, équipé d'un **moteur de mods complet (VFS)** et d'un **preset HD Remake intégré par défaut**.
+**Leonidas ViceCityStories (LVCS)** est un portage natif sur PC (Windows, Linux, macOS) et **Android** de **Grand Theft Auto: Vice City Stories** (PS2, USA, SLUS-21590), utilisant la recompilation statique d'exécutable PS2 vers C++ natif, équipé d'un **moteur de mods complet (VFS)** et d'un **preset HD Remake intégré par défaut**.
 
-Ce projet permet de redécouvrir Vice City Stories avec des graphismes modernes en haute définition (résolution interne 4K, 60+ FPS débloqué, shaders néon rétro-futuristes des années 80, distance d'affichage x3, trafic dense) et d'installer ou créer des mods par simple glisser-déposer.
+Ce projet permet de redécouvrir Vice City Stories avec des graphismes modernes en haute définition (résolution interne 4K, 60+ FPS débloqué, shaders néon rétro-futuristes des années 80, distance d'affichage x3, trafic dense), un lanceur Android dédié (`LeonidasLauncher.apk`) avec sélecteur de ROM et manette tactile complète sur l'écran, et d'installer ou créer des mods par simple glisser-déposer.
 
 ---
 
@@ -86,6 +86,18 @@ python3 tools/build.py --recompile
 ./build/vcs          # Linux / macOS
 build\vcs.exe        # Windows
 ```
+
+### Option 3 : Sur Android (Smartphones & Tablettes)
+
+1. Compilez ou préparez l'APK du lanceur Android :
+   ```bash
+   python3 tools/build_android.py --out LeonidasLauncher.apk
+   ```
+   *(Ou ouvrez directement le dossier `android/` avec Android Studio)*
+2. Installez **`LeonidasLauncher.apk`** sur votre appareil Android.
+3. Ouvrez le lanceur, sélectionnez votre fichier ISO via le sélecteur de ROM intégré.
+4. Cliquez sur **"LANCER LE JEU"** : le jeu démarre en plein écran avec la **manette tactile virtuelle** complète (joystick analogique, touches PlayStation, gâchettes $L_1/R_1/L_2/R_2$, vibrations haptiques et opacité réglable) ou votre manette sans fil Bluetooth !
+   *(Consultez `docs/ANDROID.md` pour tous les détails).*
 
 ---
 

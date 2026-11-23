@@ -17,20 +17,40 @@ namespace screens
     {
         void logo(float cx, float cy, float r)
         {
-            // Leonidas mini neon emblem: purple crown, hot pink center, cyan base
-            const Rect disc{cx - r, cy - r, r * 2, r * 2};
-            const float cut1 = cy + r * 0.12f, cut2 = cy + r * 0.45f;
-            pushClip({disc.x, disc.y, disc.w, cut1 - disc.y});
-            gradient(disc, rgb(0x662D91), theme::kPink, r);
-            popClip();
-            pushClip({disc.x, cut1 + r * 0.10f, disc.w, cut2 - cut1 - r * 0.10f});
-            gradient(disc, theme::kPink, theme::kPinkHi, r);
-            popClip();
-            pushClip({disc.x, cut2 + r * 0.14f, disc.w, r});
-            gradient(disc, theme::kPinkHi, rgb(0x29ABE2), r);
-            popClip();
-            // Tiny neon sunglasses accent
-            line(cx - r * 0.55f, cy - r * 0.15f, cx + r * 0.55f, cy - r * 0.15f, px(1.8f), rgb(0xFFFFFF));
+            // Macca the neon pink alligator mascot - transparent background (sans fond)
+            const Color kSkin = rgb(0xED1E79);      // Neon pink skin
+            const Color kShade = rgb(0xB51458);     // Deep pink shadow
+            const Color kGlasses = rgb(0x0A0512);   // Dark synthwave sunglasses
+            const Color kCyanGlint = rgb(0x29ABE2); // Vice City cyan glint
+            const Color kWhite = rgb(0xFFFFFF);     // White glint / teeth
+
+            const float s = r / 8.0f; // Scale relative to base 8px radius
+
+            // 1. Alligator head and snout (facing right, strictly transparent background)
+            // Head / cheek
+            rect({cx - 7.0f * s, cy - 6.0f * s, 10.0f * s, 12.0f * s}, kSkin, 4.0f * s);
+            // Snout extending right
+            rect({cx - 2.0f * s, cy - 2.0f * s, 10.5f * s, 6.0f * s}, kSkin, 2.5f * s);
+            // Lower jaw
+            rect({cx - 1.0f * s, cy + 3.0f * s, 7.5f * s, 3.5f * s}, kShade, 1.5f * s);
+
+            // 2. White teeth / cheeky grin
+            rect({cx + 1.0f * s, cy + 2.0f * s, 4.5f * s, 1.6f * s}, kWhite, 0.8f * s);
+
+            // 3. Crocodile nostril bump
+            rect({cx + 6.2f * s, cy - 3.2f * s, 2.2f * s, 2.0f * s}, kSkin, 1.0f * s);
+
+            // 4. Iconic synthwave black sunglasses
+            // Left lens
+            rect({cx - 4.5f * s, cy - 4.5f * s, 4.2f * s, 4.2f * s}, kGlasses, 1.0f * s);
+            // Right angled lens over snout
+            rect({cx + 0.2f * s, cy - 4.0f * s, 5.0f * s, 4.4f * s}, kGlasses, 1.2f * s);
+            // Sunglasses bridge
+            line(cx - 1.0f * s, cy - 2.5f * s, cx + 1.0f * s, cy - 2.5f * s, 1.5f * s, kGlasses);
+
+            // 5. Sunglasses specular reflection glints
+            line(cx + 1.2f * s, cy - 3.2f * s, cx + 3.2f * s, cy - 1.2f * s, 1.2f * s, kCyanGlint);
+            line(cx + 2.2f * s, cy - 3.5f * s, cx + 3.6f * s, cy - 2.1f * s, 0.8f * s, kWhite);
         }
 
         bool windowButton(std::string_view idLabel, char32_t icon, Rect r, bool close)

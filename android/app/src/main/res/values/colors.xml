@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_dark">#12081C</color>
+    <color name="bg_card">#1E0F2E</color>
+    <color name="bg_card_border">#381854</color>
+    <color name="neon_pink">#ED1E79</color>
+    <color name="neon_pink_pressed">#C41362</color>
+    <color name="neon_cyan">#29ABE2</color>
+    <color name="neon_purple">#662D91</color>
+    <color name="gold_accent">#FCEE21</color>
+    <color name="text_primary">#FDFDFE</color>
+    <color name="text_secondary">#D0B0E0</color>
+    <color name="text_dim">#806596</color>
+    <color name="pad_button_bg">#44140A1A</color>
+    <color name="pad_button_pressed">#99ED1E79</color>
+    <color name="pad_border">#8829ABE2</color>
+    <color name="pad_stick_base">#33000000</color>
+    <color name="pad_stick_thumb">#CCED1E79</color>
+</resources>
