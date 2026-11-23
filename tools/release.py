@@ -123,7 +123,10 @@ def bundle_deps(stage, platform="windows"):
         if os.path.isdir(cached):
             shutil.rmtree(cached, onerror=lambda f, p, _: (os.chmod(p, 0o666), f(p)))
         deps.fetch(cached, platform)
-    shutil.copytree(cached, os.path.join(stage, "deps"))
+    target = os.path.join(stage, "deps")
+    if os.path.isdir(target):
+        shutil.rmtree(target, onerror=lambda f, p, _: (os.chmod(p, 0o666), f(p)))
+    shutil.copytree(cached, target)
 
 
 def licenses(stage):
