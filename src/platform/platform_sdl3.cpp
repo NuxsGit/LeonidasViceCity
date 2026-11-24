@@ -410,6 +410,37 @@ namespace platform
             std::fprintf(stderr, "[platform] SDL_CreateWindow: %s\n", SDL_GetError());
             return false;
         }
+
+        // Multiplayer Dual-Session: customize window title and side-by-side positioning
+        const char *mpSession = std::getenv("LVCS_MP_SESSION");
+        const char *mpRole = std::getenv("LVCS_MP_ROLE");
+        const char *mpName = std::getenv("LVCS_MP_NAME");
+        const char *envX = std::getenv("LVCS_WINDOW_X");
+        const char *envY = std::getenv("LVCS_WINDOW_Y");
+        const char *envW = std::getenv("LVCS_WINDOW_W");
+        const char *envH = std::getenv("LVCS_WINDOW_H");
+        if (mpSession)
+        {
+            std::string t = desc.title ? desc.title : "Leonidas: Vice City Stories";
+            t += " [JOUEUR " + std::string(mpSession) + " - " + (mpRole ? mpRole : "P") + (mpName ? (": " + std::string(mpName)) : "") + "]";
+            SDL_SetWindowTitle(g_window, t.c_str());
+        }
+        if (envW && envH && envX && envY)
+        {
+            int w = std::atoi(envW), h = std::atoi(envH);
+            int x = std::atoi(envX), y = std::atoi(envY);
+            if (w > 100 && h > 100)
+            {
+                SDL_SetWindowSize(g_window, w, h);
+                SDL_SetWindowPosition(g_window, x, y);
+                g_startPlacement.x = x;
+                g_startPlacement.y = y;
+                g_startPlacement.width = w;
+                g_startPlacement.height = h;
+                g_startPlacement.maximized = false;
+                g_fullscreen = false;
+            }
+        }
         g_hiddenWindow = desc.hidden;
         if (!desc.hidden)
         {

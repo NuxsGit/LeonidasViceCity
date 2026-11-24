@@ -1299,50 +1299,59 @@ namespace launcher
         }
 
         const fs::path exe = build / os::kGameExe;
-        if (fs::is_regular_file(exe, ec))
+        if (!fs::is_regular_file(exe, ec))
         {
-            // Spawn Session 1 (Host)
-            Process::Options opt1;
-            opt1.cwd = build;
-            opt1.env.push_back({"LVCS_MP_SESSION", "1"});
-            opt1.env.push_back({"LVCS_MP_ROLE", "host"});
-            opt1.env.push_back({"LVCS_MP_PORT", "7777"});
-            opt1.env.push_back({"LVCS_MP_NAME", mpCharacter.name});
-            opt1.env.push_back({"PS2X_MEMCARD_DIR", pathText(s1Dir)});
-            opt1.env.push_back({"LVCS_WINDOW_X", "50"});
-            opt1.env.push_back({"LVCS_WINDOW_Y", "50"});
-            opt1.env.push_back({"LVCS_WINDOW_W", "900"});
-            opt1.env.push_back({"LVCS_WINDOW_H", "600"});
-            if (hdRemakePreset)
-            {
-                opt1.env.push_back({"PS2X_HW_SCALE", "4"});
-                opt1.env.push_back({"PS2X_HW_ANISO", "16"});
-                opt1.env.push_back({"LEONIDAS_POSTFX", "1"});
-            }
-            mpSession1 = std::make_unique<Process>();
-            mpSession1->start({pathText(exe), pathText(iso)}, opt1, error);
+            error = std::string(os::kBuildGame) + " n'est pas encore construit. Veuillez d'abord compiler le jeu.";
+            return false;
+        }
 
-            // Spawn Session 2 (Client)
-            Process::Options opt2;
-            opt2.cwd = build;
-            opt2.env.push_back({"LVCS_MP_SESSION", "2"});
-            opt2.env.push_back({"LVCS_MP_ROLE", "client"});
-            opt2.env.push_back({"LVCS_MP_PORT", "7777"});
-            opt2.env.push_back({"LVCS_MP_CONNECT", "127.0.0.1:7777"});
-            opt2.env.push_back({"LVCS_MP_NAME", mpCharacter.name + "_P2"});
-            opt2.env.push_back({"PS2X_MEMCARD_DIR", pathText(s2Dir)});
-            opt2.env.push_back({"LVCS_WINDOW_X", "980"});
-            opt2.env.push_back({"LVCS_WINDOW_Y", "50"});
-            opt2.env.push_back({"LVCS_WINDOW_W", "900"});
-            opt2.env.push_back({"LVCS_WINDOW_H", "600"});
-            if (hdRemakePreset)
-            {
-                opt2.env.push_back({"PS2X_HW_SCALE", "4"});
-                opt2.env.push_back({"PS2X_HW_ANISO", "16"});
-                opt2.env.push_back({"LEONIDAS_POSTFX", "1"});
-            }
-            mpSession2 = std::make_unique<Process>();
-            mpSession2->start({pathText(exe), pathText(iso)}, opt2, error);
+        // Spawn Session 1 (Host)
+        Process::Options opt1;
+        opt1.cwd = build;
+        opt1.env.push_back({"LVCS_MP_SESSION", "1"});
+        opt1.env.push_back({"LVCS_MP_ROLE", "host"});
+        opt1.env.push_back({"LVCS_MP_PORT", "7777"});
+        opt1.env.push_back({"LVCS_MP_NAME", mpCharacter.name});
+        opt1.env.push_back({"PS2X_MEMCARD_DIR", pathText(s1Dir)});
+        opt1.env.push_back({"LVCS_WINDOW_X", "40"});
+        opt1.env.push_back({"LVCS_WINDOW_Y", "60"});
+        opt1.env.push_back({"LVCS_WINDOW_W", "880"});
+        opt1.env.push_back({"LVCS_WINDOW_H", "540"});
+        if (hdRemakePreset)
+        {
+            opt1.env.push_back({"PS2X_HW_SCALE", "4"});
+            opt1.env.push_back({"PS2X_HW_ANISO", "16"});
+            opt1.env.push_back({"LEONIDAS_POSTFX", "1"});
+        }
+        mpSession1 = std::make_unique<Process>();
+        if (!mpSession1->start({pathText(exe), pathText(iso)}, opt1, error))
+        {
+            return false;
+        }
+
+        // Spawn Session 2 (Client)
+        Process::Options opt2;
+        opt2.cwd = build;
+        opt2.env.push_back({"LVCS_MP_SESSION", "2"});
+        opt2.env.push_back({"LVCS_MP_ROLE", "client"});
+        opt2.env.push_back({"LVCS_MP_PORT", "7777"});
+        opt2.env.push_back({"LVCS_MP_CONNECT", "127.0.0.1:7777"});
+        opt2.env.push_back({"LVCS_MP_NAME", mpCharacter.name + "_P2"});
+        opt2.env.push_back({"PS2X_MEMCARD_DIR", pathText(s2Dir)});
+        opt2.env.push_back({"LVCS_WINDOW_X", "940"});
+        opt2.env.push_back({"LVCS_WINDOW_Y", "60"});
+        opt2.env.push_back({"LVCS_WINDOW_W", "880"});
+        opt2.env.push_back({"LVCS_WINDOW_H", "540"});
+        if (hdRemakePreset)
+        {
+            opt2.env.push_back({"PS2X_HW_SCALE", "4"});
+            opt2.env.push_back({"PS2X_HW_ANISO", "16"});
+            opt2.env.push_back({"LEONIDAS_POSTFX", "1"});
+        }
+        mpSession2 = std::make_unique<Process>();
+        if (!mpSession2->start({pathText(exe), pathText(iso)}, opt2, error))
+        {
+            return false;
         }
 
         mpDualRunning = true;
