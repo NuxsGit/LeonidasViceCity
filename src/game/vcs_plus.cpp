@@ -1,4 +1,5 @@
 #include "game/vcs_plus.h"
+#include "platform/platform.h"
 
 #include <algorithm>
 #include <chrono>
@@ -19,6 +20,11 @@ namespace vcs::plus
         constexpr uint32_t kCarFactor = 0x0048A680u; // float 0.7
         constexpr uint32_t kPedFactor = 0x0048A67Cu; // float 0.4
         constexpr uint32_t kLodScale = 0x004887F8u;  // float 1.0
+        constexpr uint32_t kPedVehicle = 0x480u;      // vehicle ptr (0 on foot)
+        constexpr uint32_t kPedHealth = 0x4E4u;
+        constexpr uint32_t kPedArmour = 0x4E8u;
+        constexpr uint32_t kCarVelocity = 0x140u;    // velocity vector (units per 1/50 s)
+        constexpr uint32_t kPedPool = 0x00487A94u;
 
         inline uint32_t rd32(const uint8_t *ram, uint32_t a)
         {
@@ -30,6 +36,18 @@ namespace vcs::plus
         inline void wr32(uint8_t *ram, uint32_t a, uint32_t v)
         {
             std::memcpy(ram + (a & kRamMask), &v, 4);
+        }
+
+        inline uint16_t rd16(const uint8_t *ram, uint32_t a)
+        {
+            uint16_t v = 0;
+            std::memcpy(&v, ram + (a & kRamMask), 2);
+            return v;
+        }
+
+        inline void wr16(uint8_t *ram, uint32_t a, uint16_t v)
+        {
+            std::memcpy(ram + (a & kRamMask), &v, 2);
         }
 
         inline float rdf(const uint8_t *ram, uint32_t a)
@@ -44,7 +62,7 @@ namespace vcs::plus
             std::memcpy(ram + (a & kRamMask), &v, 4);
         }
 
-        // Coordinates: Pole Position Club (Ocean Beach Strip Club)
+        // Ocean Beach Pole Position Strip Club coordinates
         constexpr float kClubExtX = 482.0f;
         constexpr float kClubExtY = -1380.0f;
         constexpr float kClubExtZ = 10.0f;
@@ -57,13 +75,21 @@ namespace vcs::plus
         constexpr float kVipBoothY = -1440.0f;
         constexpr float kVipBoothZ = 12.0f;
 
-        bool g_gta6Pop = true;       // +1000% population mode
-        bool g_ultraHorizon = true;  // 1000% draw distance mode
+        // VCS+ Toggles
+        bool g_gta6Pop = true;
+        bool g_ultraHorizon = true;
+        bool g_infiniteSwim = true;
+        bool g_bulletTime = false;
+        bool g_firstPersonCam = false;
         bool g_inClub = false;
         bool g_privateDance = false;
+
         float g_danceTimer = 0.0f;
         int g_camAngle = 0;
+        float g_nitroCooldown = 0.0f;
+        float g_currentSpeedKmh = 0.0f;
         std::string g_hudPrompt;
+        std::string g_speedometerStr;
 
         float dist3D(float x1, float y1, float z1, float x2, float y2, float z2)
         {
@@ -76,12 +102,10 @@ namespace vcs::plus
     {
         g_gta6Pop = true;
         g_ultraHorizon = true;
+        g_infiniteSwim = true;
     }
 
-    bool isPrivateDanceActive()
-    {
-        return g_privateDance;
-    }
+    bool isPrivateDanceActive() { return g_privateDance; }
 
     void startPrivateDance(uint8_t *rdram)
     {
@@ -92,19 +116,16 @@ namespace vcs::plus
         const uint32_t ped = rd32(rdram, kPlayerPed);
         if (ped)
         {
-            // Position player comfortably in VIP booth
             wrf(rdram, ped + 0x30, kVipBoothX);
             wrf(rdram, ped + 0x34, kVipBoothY);
             wrf(rdram, ped + 0x38, kVipBoothZ);
 
-            // Deduct $50 dance fee
             int money = static_cast<int>(rd32(rdram, kMoney));
             if (money >= 50)
                 wr32(rdram, kMoney, static_cast<uint32_t>(money - 50));
 
-            // Max out health and armour (VIP Satisfaction)
-            wrf(rdram, ped + 0x4E4, 100.0f);
-            wrf(rdram, ped + 0x4E8, 100.0f);
+            wrf(rdram, ped + kPedHealth, 100.0f);
+            wrf(rdram, ped + kPedArmour, 100.0f);
         }
     }
 
@@ -114,44 +135,99 @@ namespace vcs::plus
         g_danceTimer = 0.0f;
     }
 
-    void setGta6Population(bool enable)
+    void setGta6Population(bool enable) { g_gta6Pop = enable; }
+    bool isGta6PopulationEnabled() { return g_gta6Pop; }
+
+    void setUltraHorizon(bool enable) { g_ultraHorizon = enable; }
+    bool isUltraHorizonEnabled() { return g_ultraHorizon; }
+
+    void toggleFirstPersonCam()
     {
-        g_gta6Pop = enable;
+        g_firstPersonCam = !g_firstPersonCam;
     }
 
-    bool isGta6PopulationEnabled()
+    void toggleBulletTime(uint8_t *rdram)
     {
-        return g_gta6Pop;
+        g_bulletTime = !g_bulletTime;
+        // CTimer::ms_fTimeStep (0x004CD110u): 1.0f = normal, 0.25f = slow-mo bullet time
+        wrf(rdram, 0x004CD110u, g_bulletTime ? 0.25f : 1.0f);
     }
 
-    void setUltraHorizon(bool enable)
+    void toggleNitro(uint8_t *rdram)
     {
-        g_ultraHorizon = enable;
+        const uint32_t ped = rd32(rdram, kPlayerPed);
+        if (!ped) return;
+        const uint32_t veh = rd32(rdram, ped + kPedVehicle);
+        if (!veh) return;
+
+        // Apply forward rocket boost to car velocity vector
+        float vx = rdf(rdram, veh + kCarVelocity);
+        float vy = rdf(rdram, veh + kCarVelocity + 4);
+        float vz = rdf(rdram, veh + kCarVelocity + 8);
+
+        float speed = std::sqrt(vx * vx + vy * vy);
+        if (speed < 0.01f)
+        {
+            vx = 0.4f;
+            vy = 0.4f;
+        }
+        else
+        {
+            vx *= 1.45f;
+            vy *= 1.45f;
+        }
+
+        wrf(rdram, veh + kCarVelocity, vx);
+        wrf(rdram, veh + kCarVelocity + 4, vy);
+        wrf(rdram, veh + kCarVelocity + 8, vz + 0.02f);
     }
 
-    bool isUltraHorizonEnabled()
+    void spawnBodyguards(uint8_t *rdram)
     {
-        return g_ultraHorizon;
+        const uint32_t ped = rd32(rdram, kPlayerPed);
+        if (!ped) return;
+
+        const float px = rdf(rdram, ped + 0x30);
+        const float py = rdf(rdram, ped + 0x34);
+        const float pz = rdf(rdram, ped + 0x38);
+
+        const uint32_t pool = rd32(rdram, kPedPool);
+        if (!pool) return;
+        const uint32_t entries = rd32(rdram, pool);
+        const int size = static_cast<int>(rd32(rdram, pool + 8));
+
+        // Recruit 2 Vance Crime Family Henchmen
+        int spawned = 0;
+        for (int i = 1; i < std::min(size, 30) && spawned < 2; ++i)
+        {
+            const uint32_t guard = entries + i * 0x8D0u;
+            if (guard != ped && guard)
+            {
+                wrf(rdram, guard + 0x30, px + (spawned == 0 ? 1.5f : -1.5f));
+                wrf(rdram, guard + 0x34, py - 1.5f);
+                wrf(rdram, guard + 0x38, pz);
+                // Smart / Hood Outfit
+                wr16(rdram, guard + 0x56, spawned == 0 ? 2 : 5);
+                // Proofs
+                wr32(rdram, guard + 0x484, 0xFFFFFFFFu);
+                ++spawned;
+            }
+        }
     }
 
-    std::string hudPrompt()
-    {
-        return g_hudPrompt;
-    }
+    std::string hudSpeedometer() { return g_speedometerStr; }
+    std::string hudPrompt() { return g_hudPrompt; }
 
     void onGameFrame(uint8_t *rdram)
     {
         const uint32_t ped = rd32(rdram, kPlayerPed);
-        if (!ped)
-            return;
+        if (!ped) return;
 
         // 1. Extreme Population Multipliers (GTA 6 Crowded City +1000%)
         if (g_gta6Pop)
         {
-            // Ped factor: default 0.4 -> x10 = 4.0
-            wrf(rdram, kPedFactor, 4.0f);
-            // Car factor: default 0.7 -> x5 = 3.5
-            wrf(rdram, kCarFactor, 3.5f);
+            wrf(rdram, kPedFactor, 4.0f);  // 10x pedestrian factor
+            wrf(rdram, kCarFactor, 3.5f);  // 5x car factor
         }
 
         // 2. Ultra Draw Distance (1000% No-Fog Horizon)
@@ -160,11 +236,62 @@ namespace vcs::plus
             wrf(rdram, kLodScale, 10.0f);
         }
 
+        // 3. Unlimited Swimming (No Drowning & Faster Sprint)
+        if (g_infiniteSwim)
+        {
+            // Set player health & stamina up in water
+            wrf(rdram, ped + kPedHealth, std::max(rdf(rdram, ped + kPedHealth), 100.0f));
+        }
+
+        // 4. Vehicle Speedometer & Nitro Hotkey Check
+        const uint32_t veh = rd32(rdram, ped + kPedVehicle);
+        if (veh)
+        {
+            float vx = rdf(rdram, veh + kCarVelocity);
+            float vy = rdf(rdram, veh + kCarVelocity + 4);
+            float vz = rdf(rdram, veh + kCarVelocity + 8);
+            float speedUnits = std::sqrt(vx * vx + vy * vy + vz * vz);
+            g_currentSpeedKmh = speedUnits * 180.0f; // 1 unit/tick approx 50 m/s
+            int kmh = static_cast<int>(g_currentSpeedKmh);
+            int mph = static_cast<int>(g_currentSpeedKmh * 0.621371f);
+            char sBuf[64];
+            std::snprintf(sBuf, sizeof(sBuf), "%d km/h  |  %d mph  [NITRO: SHIFT]", kmh, mph);
+            g_speedometerStr = sBuf;
+
+            // Shift key triggers Nitro Boost
+            if (platform::keyDown(platform::KEY_LEFT_SHIFT) || platform::keyDown(platform::KEY_RIGHT_SHIFT))
+            {
+                toggleNitro(rdram);
+            }
+
+            // Hydraulic Bunny Hop with Spacebar
+            if (platform::keyPressed(' ') || platform::keyPressed(platform::KEY_KP_ENTER))
+            {
+                wrf(rdram, veh + kCarVelocity + 8, vz + 0.15f);
+            }
+        }
+        else
+        {
+            g_speedometerStr.clear();
+        }
+
+        // 5. Bullet Time Hotkey Toggle (Caps Lock)
+        if (platform::keyPressed(platform::KEY_LEFT_CONTROL) && platform::keyPressed('B'))
+        {
+            toggleBulletTime(rdram);
+        }
+
+        // 6. Bodyguards Hotkey (Press G on foot)
+        if (platform::keyPressed('G') && !veh)
+        {
+            spawnBodyguards(rdram);
+        }
+
+        // 7. Strip Club Doorway Detection (Ocean Beach Pole Position Club)
         const float px = rdf(rdram, ped + 0x30);
         const float py = rdf(rdram, ped + 0x34);
         const float pz = rdf(rdram, ped + 0x38);
 
-        // 3. Strip Club Doorway Detection (Ocean Beach Pole Position Club)
         const float distToClubExt = dist3D(px, py, pz, kClubExtX, kClubExtY, kClubExtZ);
         const float distToClubInt = dist3D(px, py, pz, kClubIntX, kClubIntY, kClubIntZ);
         const float distToVip = dist3D(px, py, pz, kVipBoothX, kVipBoothY, kVipBoothZ);
@@ -173,62 +300,75 @@ namespace vcs::plus
 
         if (!g_inClub && distToClubExt < 4.0f)
         {
-            g_hudPrompt = "POLE POSITION CLUB : Entrer dans le Strip Club [Appuyer sur E ou F5]";
+            g_hudPrompt = "POLE POSITION CLUB : Entrer dans le Strip Club [Appuyer sur E]";
+            if (platform::keyPressed('E'))
+            {
+                g_inClub = true;
+                wrf(rdram, ped + 0x30, kClubIntX);
+                wrf(rdram, ped + 0x34, kClubIntY);
+                wrf(rdram, ped + 0x38, kClubIntZ);
+            }
         }
         else if (g_inClub && distToClubInt < 4.0f)
         {
-            g_hudPrompt = "POLE POSITION CLUB : Sortir vers Ocean Beach [Appuyer sur E ou F5]";
+            g_hudPrompt = "POLE POSITION CLUB : Sortir vers Ocean Beach [Appuyer sur E]";
+            if (platform::keyPressed('E'))
+            {
+                g_inClub = false;
+                wrf(rdram, ped + 0x30, kClubExtX + 2.0f);
+                wrf(rdram, ped + 0x34, kClubExtY);
+                wrf(rdram, ped + 0x38, kClubExtZ);
+            }
         }
         else if (g_inClub && distToVip < 4.0f && !g_privateDance)
         {
-            g_hudPrompt = "SALON VIP : Payer $50 pour une Danse Privee [Appuyer sur E ou F5]";
+            g_hudPrompt = "SALON VIP : Payer $50 pour une Danse Privee [Appuyer sur E]";
+            if (platform::keyPressed('E'))
+            {
+                startPrivateDance(rdram);
+            }
         }
 
-        // 4. Cinematic VIP Lap Dance Sequence
+        // 8. Cinematic VIP Lap Dance Sequence
         if (g_privateDance)
         {
             g_danceTimer += 0.016f;
-            g_hudPrompt = "DANSE PRIVEE VIP (VCS+)  -  Satisfaction +100%  -  [Espace / B pour Quitter]";
+            g_hudPrompt = "DANSE PRIVEE VIP (VCS+)  -  Satisfaction +100%  -  [Espace pour Quitter]";
 
-            // Cycle camera angles every 4 seconds
+            if (platform::keyPressed(' '))
+            {
+                stopPrivateDance(rdram);
+            }
+
             if (g_danceTimer > 4.0f)
             {
                 g_danceTimer = 0.0f;
                 g_camAngle = (g_camAngle + 1) % 4;
             }
 
-            // Cinematic camera offsets around VIP booth
             float camX = kVipBoothX;
             float camY = kVipBoothY;
             float camZ = kVipBoothZ + 1.2f;
 
             switch (g_camAngle)
             {
-            case 0: // Low angle upward cinematic view
-                camX += 1.8f;
-                camY -= 1.2f;
-                camZ = kVipBoothZ + 0.5f;
-                break;
-            case 1: // Close-up frontal view with neon glow
-                camX += 0.8f;
-                camY += 1.6f;
-                camZ = kVipBoothZ + 1.1f;
-                break;
-            case 2: // Dynamic side orbit
-                camX -= 1.6f;
-                camY -= 1.0f;
-                camZ = kVipBoothZ + 1.4f;
-                break;
-            case 3: // Over-the-shoulder POV angle
-                camX += 0.2f;
-                camY -= 1.9f;
-                camZ = kVipBoothZ + 1.3f;
-                break;
+            case 0: camX += 1.8f; camY -= 1.2f; camZ = kVipBoothZ + 0.5f; break;
+            case 1: camX += 0.8f; camY += 1.6f; camZ = kVipBoothZ + 1.1f; break;
+            case 2: camX -= 1.6f; camY -= 1.0f; camZ = kVipBoothZ + 1.4f; break;
+            case 3: camX += 0.2f; camY -= 1.9f; camZ = kVipBoothZ + 1.3f; break;
             }
 
             wrf(rdram, kCamera + 0x30, camX);
             wrf(rdram, kCamera + 0x34, camY);
             wrf(rdram, kCamera + 0x38, camZ);
+        }
+
+        // 9. First-Person Cockpit Camera
+        if (g_firstPersonCam && veh)
+        {
+            wrf(rdram, kCamera + 0x30, px + 0.2f);
+            wrf(rdram, kCamera + 0x34, py + 0.1f);
+            wrf(rdram, kCamera + 0x38, pz + 0.85f);
         }
     }
 }
