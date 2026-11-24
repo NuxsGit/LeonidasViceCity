@@ -137,6 +137,42 @@ namespace launcher
         void applyHdRemakePreset(bool enable);
         void openModsFolder();
 
+        // LeonidasViceCity Multiplayer & Character Editor
+        struct MultiplayerCharacter
+        {
+            std::string name = "Vic_Vance";
+            int gender = 0;      // 0: Male, 1: Female
+            int skinTone = 1;    // 0: Fair, 1: Sun-kissed / Tanned, 2: Olive, 3: Deep
+            int hairStyle = 0;   // 0..5
+            int hairColor = 4;   // 0: Black, 1: Brown, 2: Blonde, 3: Red, 4: Neon Pink, 5: Vice Cyan, 6: Silver
+            int outfit = 0;      // 0: Hawaiian Shirt, 1: Pastel Suit, 2: Leather Jacket, 3: Muscle Beach Tank, 4: Tracksuit, 5: Denim Vest
+            int outfitColor = 0; // 0: Pastel Pink, 1: Ocean Cyan, 2: Pure White, 3: Midnight Black, 4: Synth Purple, 5: Sunset Gold
+            int pants = 0;       // 0: Linen Slacks, 1: 80s Denim Jeans, 2: Beach Bermuda, 3: Leather Pants
+            int accessory = 1;   // 0: None, 1: Aviator Sunglasses, 2: Gold Chain, 3: Bandana, 4: Driving Gloves
+            int cash = 5000;
+            int rep = 100;
+            std::string serverHost = "127.0.0.1";
+            int serverPort = 7777;
+        };
+
+        MultiplayerCharacter mpCharacter;
+        std::vector<std::string> mpSaves;
+        std::string currentMpSave = "MP_SLOT_01";
+        std::unique_ptr<Process> mpSession1;
+        std::unique_ptr<Process> mpSession2;
+        std::unique_ptr<Process> mpRelay;
+        bool mpDualRunning = false;
+        std::string mpStatusText = "Relay ready (127.0.0.1:7777)";
+
+        void loadMultiplayerProfile();
+        void saveMultiplayerProfile();
+        void refreshMultiplayerSaves();
+        void saveMultiplayerSlot(const std::string &slotName);
+        void loadMultiplayerSlot(const std::string &slotName);
+        bool startMultiplayerDualSession(std::string &error);
+        void stopMultiplayerDualSession();
+        bool testMultiplayerRelay(std::string &resultMessage);
+
         // the game
         std::unique_ptr<Process> game;
         bool gameRunning = false, gameEnded = false;

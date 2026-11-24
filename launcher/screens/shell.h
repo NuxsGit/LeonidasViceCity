@@ -35,6 +35,7 @@ namespace screens
         Help,
         Folder,
         Mods,
+        Multiplayer,
     };
 
     enum class Dialog
@@ -82,6 +83,9 @@ namespace screens
 
         Sheet sheet = Sheet::None, sheetShown = Sheet::None;
         core::Spring sheetSpring;
+
+        int mpTab = 0;
+        std::string mpNewSaveName;
 
         Dialog dialog = Dialog::None, dialogShown = Dialog::None;
         float dialogT = 0;

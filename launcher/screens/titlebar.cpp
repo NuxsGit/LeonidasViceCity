@@ -149,6 +149,7 @@ namespace screens
         const Nav navs[] = {{"Help", theme::icon::kHelp, Sheet::Help},
                             {"Settings", theme::icon::kSettings, Sheet::Settings},
                             {"Mods", theme::icon::kRepair, Sheet::Mods},
+                            {"Multiplayer", theme::icon::kSync, Sheet::Multiplayer},
                             {"Saves", theme::icon::kSave, Sheet::Saves}};
         for (const Nav &n : navs)
         {

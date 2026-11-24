@@ -33,6 +33,11 @@ Ce projet permet de redécouvrir Vice City Stories avec des graphismes modernes 
 - **Widescreen & Ultrawide** : affichage natif 16:9, 21:9 et 32:9 (Hor+) avec interface et radar positionnés sur les bords de l'écran.
 - **Fluidité 60 / 120 / 144+ FPS** : moteur physique et scripts recalibrés sur le temps réel pour éliminer les bugs de vitesse de la version 30 FPS console.
 - **Distance d'affichage x3 (300%)** : bâtiments détaillés, palmiers et véhicules visibles à perte de vue sans aucun popping.
+
+### 4. 🌐 Mode Multijoueur & Éditeur de Personnage Intégré (LVCS-MP)
+- **Éditeur de Personnage dans le Launcher C++** : personnalisation en direct avec rendu visuel dynamique du portrait (sexe, teint de peau, coupe et couleur de cheveux, tenues et hauts rétro 80s, pantalons, lunettes aviator, chaîne en or et accessoires).
+- **Sauvegardes Multijoueur Isolées** : les profils et sauvegardes multijoueur sont gérés séparément dans `build/multiplayer/saves/` sans jamais altérer les sauvegardes de la campagne solo (`mc0/`).
+- **Outil Développeur Double Session** : lancez en un clic 2 sessions distinctes du jeu (Session 1 Hôte sur port 7777 / Session 2 Client rejoignant 127.0.0.1:7777) synchronisées via le serveur relais loopback local (`tools/multiplayer_relay.py`).
 - **Extreme City Life** : densité de trafic et de piétons jusqu'à 300% avec persistance (les véhicules ne disparaissent plus instantanément lorsque vous tournez la caméra).
 
 ---
