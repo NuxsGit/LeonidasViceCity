@@ -1,5 +1,5 @@
 {
-  "version": "0.4.7",
+  "version": "0.4.8",
   "repository": "NuxsGit/LeonidasViceCity",
   "files": [
     ".gitattributes",
@@ -68,6 +68,7 @@
     "docs/releases/v0.3.0.md",
     "docs/releases/v0.4.0.md",
     "docs/releases/v0.4.5.md",
+    "docs/releases/v0.4.8.md",
     "game/vcs/extra_functions.csv",
     "game/vcs/functions.csv",
     "game/vcs/overrides.toml",
@@ -258,6 +259,8 @@
     "src/game/vcs_input.h",
     "src/game/vcs_movie.cpp",
     "src/game/vcs_movie.h",
+    "src/game/vcs_multiplayer.cpp",
+    "src/game/vcs_multiplayer.h",
     "src/game/vcs_music_timing.cpp",
     "src/game/vcs_music_timing.h",
     "src/game/vcs_overrides.cpp",
