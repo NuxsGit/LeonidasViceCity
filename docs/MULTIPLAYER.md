@@ -72,4 +72,7 @@ python3 tools/multiplayer_relay.py --launch-dual
 
 # Stopper le relais réseau
 python3 tools/multiplayer_relay.py --stop
+
+# Lancer la suite de tests automatisés multijoueur
+python3 tools/test_multiplayer.py
 ```
