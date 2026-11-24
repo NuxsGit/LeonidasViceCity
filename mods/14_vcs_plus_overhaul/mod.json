@@ -1,16 +1,21 @@
 {
   "id": "vcs_plus_overhaul",
-  "name": "VCS+ Mega Overhaul (Ocean Beach Strip Club, VIP Lap Dance & GTA 6 Crowded City)",
+  "name": "VCS+ Ultimate Mega-Mod (Strip Club VIP, GTA 6 1000% Pop, Nitro & Community Wishlist)",
   "author": "Leonidas Vice City Community",
-  "version": "1.0.0",
-  "description": "Ajoute l'acces complet a l'interieur du Pole Position Club d'Ocean Beach avec cinematiques de danse privee VIP payante (style Vanilla Unicorn de GTA V), densite extreme de population a 1000% (rues bondees comme GTA 6) et affichage horizon de la carte a 1000% sans brouillard.",
+  "version": "1.1.0",
+  "description": "Le mod ultime integrant les 10 fonctionnalites les plus demandees par la communaute GTA Vice City Stories : Strip Club Pole Position avec danses privees VIP, Population extreme a +1000% (rues bondees style GTA 6), Nitro Boost sur tous les vehicules, Saut Hydraulique, Nage infinie sans noyade, Gardes du corps de l'Empire Vance, Bullet Time ralenti, Compteur digital et Horizon a 1000%.",
   "enabled_by_default": true,
   "category": "gameplay",
   "features": [
-    "Pole Position Club (Ocean Beach Strip Club) accessible a pied avec interieur complet",
-    "Danse privee VIP interactive payante ($50) avec angles de camera cinematiques et satisfaction +100%",
-    "Population extreme +1000% (x10 pietons et trafic) pour une ville ultra-vivante style GTA 6",
-    "Distance d'affichage horizon a 1000% (toute la carte de Vice City visible sans clipping)",
-    "Controle en direct via le menu F5 Trainer ou la touche E"
+    "Pole Position Strip Club a Ocean Beach accessible a pied avec interieur complet",
+    "Danse privee VIP interactive payante ($50) avec 4 cameras cinematiques et satisfaction +100%",
+    "Population urbaine extreme +1000% (x10 pietons et x5 trafic) style GTA 6",
+    "Distance d'affichage horizon a 1000% (toute la carte sans brouillard)",
+    "Nitro Boost [Shift] sur toutes les voitures avec acceleration fusee",
+    "Saut hydraulique [Espace] en vehicule pour franchir les obstacles",
+    "Nage infinie sans noyade et sprint aquatique rapide",
+    "Recrutement de gardes du corps armes de l'Empire Vance [Touche G]",
+    "Ralenti de tir Bullet Time / Dead Eye cinematique [Ctrl + B]",
+    "Compteur de vitesse digital dynamique (km/h et mph) sur le HUD"
   ]
 }

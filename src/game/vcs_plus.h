@@ -5,25 +5,30 @@
 
 namespace vcs::plus
 {
-    // Initializes VCS+ Mod systems
+    // Initializes VCS+ Community Mod systems
     void init();
 
     // Called on every game frame kick from markFrameKick in vcs_overrides.cpp
     void onGameFrame(uint8_t *rdram);
 
-    // Activates or toggles Pole Position Club VIP Lap Dance
+    // Feature Toggles & Controls
+    void toggleNitro(uint8_t *rdram);
+    void toggleBulletTime(uint8_t *rdram);
+    void toggleFirstPersonCam();
+    void spawnBodyguards(uint8_t *rdram);
+
+    // Pole Position Strip Club & VIP Lap Dance
     void startPrivateDance(uint8_t *rdram);
     void stopPrivateDance(uint8_t *rdram);
     bool isPrivateDanceActive();
 
-    // Sets extreme population (+1000% GTA 6 crowded city mode)
+    // Extreme Population & Draw Distance
     void setGta6Population(bool enable);
     bool isGta6PopulationEnabled();
-
-    // Sets ultra draw distance / map expansion (1000% no-fog horizon)
     void setUltraHorizon(bool enable);
     bool isUltraHorizonEnabled();
 
-    // Get current status notification string for HUD
+    // Get current HUD speedometer and prompt strings
+    std::string hudSpeedometer();
     std::string hudPrompt();
 }
