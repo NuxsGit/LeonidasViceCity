@@ -1313,6 +1313,8 @@ namespace launcher
         opt1.env.push_back({"LVCS_MP_PORT", "7777"});
         opt1.env.push_back({"LVCS_MP_NAME", mpCharacter.name});
         opt1.env.push_back({"PS2X_MEMCARD_DIR", pathText(s1Dir)});
+        opt1.env.push_back({"PS2X_CONTROL", "1"});
+        opt1.env.push_back({"PS2X_CONTROL_PORT", "47615"});
         opt1.env.push_back({"LVCS_WINDOW_X", "40"});
         opt1.env.push_back({"LVCS_WINDOW_Y", "60"});
         opt1.env.push_back({"LVCS_WINDOW_W", "880"});
@@ -1338,6 +1340,8 @@ namespace launcher
         opt2.env.push_back({"LVCS_MP_CONNECT", "127.0.0.1:7777"});
         opt2.env.push_back({"LVCS_MP_NAME", mpCharacter.name + "_P2"});
         opt2.env.push_back({"PS2X_MEMCARD_DIR", pathText(s2Dir)});
+        opt2.env.push_back({"PS2X_CONTROL", "1"});
+        opt2.env.push_back({"PS2X_CONTROL_PORT", "47616"});
         opt2.env.push_back({"LVCS_WINDOW_X", "940"});
         opt2.env.push_back({"LVCS_WINDOW_Y", "60"});
         opt2.env.push_back({"LVCS_WINDOW_W", "880"});
