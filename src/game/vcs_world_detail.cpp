@@ -68,7 +68,7 @@ namespace vcs::world
         constexpr uint32_t kPackets = 0x00520F90u; // +0x14 half in use, +0x18 cursor up, +0x1C data down, halves from +0x20
         constexpr uint32_t kPacketHalf = 0xE6670u;
 
-        constexpr int kMaxPercent = 300;
+        constexpr int kMaxPercent = 1000; // VCS+: up to 1000% (x10 GTA 6 crowded city population and horizon draw distance)
         constexpr int kCarCapMax = 28;       // FUN_00430148 stops at 30 random cars on its own
         constexpr int kPedCapMax = 45;
         constexpr int kVehicleReserve = 16;  // free slots kept: the game deletes the closest car below 8
