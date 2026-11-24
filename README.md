@@ -38,6 +38,15 @@ Ce projet permet de redécouvrir Vice City Stories avec des graphismes modernes 
 - **Éditeur de Personnage dans le Launcher C++** : personnalisation en direct avec rendu visuel dynamique du portrait (sexe, teint de peau, coupe et couleur de cheveux, tenues et hauts rétro 80s, pantalons, lunettes aviator, chaîne en or et accessoires).
 - **Sauvegardes Multijoueur Isolées** : les profils et sauvegardes multijoueur sont gérés séparément dans `build/multiplayer/saves/` sans jamais altérer les sauvegardes de la campagne solo (`mc0/`).
 - **Outil Développeur Double Session** : lancez en un clic 2 sessions distinctes du jeu (Session 1 Hôte sur port 7777 / Session 2 Client rejoignant 127.0.0.1:7777) synchronisées via le serveur relais loopback local (`tools/multiplayer_relay.py`).
+
+### 5. 🌴 Mod VCS+ : Les 10 Fonctionnalités Communautaires Ultimes
+- **Pole Position Club (Ocean Beach Strip Club)** : entrée libre à pied et salon VIP avec danses privées interactives payantes ($50), 4 caméras cinématographiques et recharge complète de vie/armure (*style Vanilla Unicorn de GTA V*).
+- **Population Urbaine +1000% (Style GTA 6)** : rues et trottoirs ultra-denses avec x10 piétons et x5 circulation automobile continue.
+- **Nitro Rocket Boost (NOS) & Saut Hydraulique** : accélération instantanée façon fusée avec `Shift` et franchissement d'obstacles avec `Espace` sur tous les véhicules.
+- **Nage Infinie sans Noyade** : Vic Vance peut explorer l'océan sans aucune restriction d'endurance.
+- **Gardes du Corps de l'Empire Vance** : recrutement instantané de 2 hommes de main armés en costume 80s avec la touche `G`.
+- **Bullet Time / Dead Eye** : ralenti cinématographique à 25% de la vitesse de jeu avec `Ctrl + B`.
+- **Compteur de Vitesse Digital & Horizon à 1000%** : affichage en direct en km/h et mph, avec suppression totale du mur de brouillard sur toute la carte.
 - **Extreme City Life** : densité de trafic et de piétons jusqu'à 300% avec persistance (les véhicules ne disparaissent plus instantanément lorsque vous tournez la caméra).
 
 ---
