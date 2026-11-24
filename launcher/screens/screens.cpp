@@ -562,7 +562,7 @@ namespace screens
             g_forcedMode = int(Mode::Task);
         }
         else if (kind == "sheet")
-            openSheet(which == "saves" ? Sheet::Saves : which == "settings" ? Sheet::Settings : which == "mods" ? Sheet::Mods : which == "help" ? Sheet::Help : Sheet::Folder);
+            openSheet(which == "saves" ? Sheet::Saves : which == "settings" ? Sheet::Settings : which == "mods" ? Sheet::Mods : which == "multiplayer" ? Sheet::Multiplayer : which == "help" ? Sheet::Help : Sheet::Folder);
         else if (kind == "dialog")
         {
             if (which == "restore")

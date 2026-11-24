@@ -128,13 +128,13 @@ namespace screens
                 play(app);
 
             // Leonidas Multiplayer button
-            const float mpW = ui::buttonWidth("Multijoueur", theme::icon::kGame, 0, kFontSemibold, "BIENT\xC3\x94T");
+            const float mpW = ui::buttonWidth("Multijoueur", theme::icon::kSync, 0, kFontSemibold, "ONLINE");
             const Rect mpBtn{playBtn.right() + px(16), playBtn.y + (playBtn.h - px(44)) * 0.5f, mpW, px(44)};
-            if (ui::button("Multijoueur", mpBtn, ButtonStyle::Secondary, theme::icon::kGame, true, 0, kFontSemibold, "BIENT\xC3\x94T"))
+            if (ui::button("Multijoueur", mpBtn, ButtonStyle::Secondary, theme::icon::kSync, true, 0, kFontSemibold, "ONLINE"))
             {
-                app.say("Multijoueur Leonidas (LVCS-MP) : En cours de d\xC3\xA9veloppement. Bient\xC3\xB4t disponible !");
+                openSheet(Sheet::Multiplayer);
             }
-            ui::tooltip(ui::id("Multijoueur"), mpBtn, "Mode Multijoueur en ligne Leonidas (LVCS-MP) \xE2\x80\x94 Bient\xC3\xB4t disponible !");
+            ui::tooltip(ui::id("Multijoueur"), mpBtn, "Mode Multijoueur Leonidas (LVCS-MP) : Editeur de personnage, sauvegardes dediees & outil dev double session.");
 
             // the update says it is new with a badge; why, in its tooltip
             y += big.h + px(14);
@@ -158,13 +158,13 @@ namespace screens
                 play(app);
 
             // Leonidas Multiplayer button
-            const float mpW = ui::buttonWidth("Multijoueur", theme::icon::kGame, 0, kFontSemibold, "BIENT\xC3\x94T");
+            const float mpW = ui::buttonWidth("Multijoueur", theme::icon::kSync, 0, kFontSemibold, "ONLINE");
             const Rect mpBtn{playBtn.right() + px(16), playBtn.y + (playBtn.h - px(44)) * 0.5f, mpW, px(44)};
-            if (ui::button("Multijoueur", mpBtn, ButtonStyle::Secondary, theme::icon::kGame, true, 0, kFontSemibold, "BIENT\xC3\x94T"))
+            if (ui::button("Multijoueur", mpBtn, ButtonStyle::Secondary, theme::icon::kSync, true, 0, kFontSemibold, "ONLINE"))
             {
-                app.say("Multijoueur Leonidas (LVCS-MP) : En cours de d\xC3\xA9veloppement. Bient\xC3\xB4t disponible !");
+                openSheet(Sheet::Multiplayer);
             }
-            ui::tooltip(ui::id("Multijoueur"), mpBtn, "Mode Multijoueur en ligne Leonidas (LVCS-MP) \xE2\x80\x94 Bient\xC3\xB4t disponible !");
+            ui::tooltip(ui::id("Multijoueur"), mpBtn, "Mode Multijoueur Leonidas (LVCS-MP) : Editeur de personnage, sauvegardes dediees & outil dev double session.");
 
             below = buildSummary(app);
         }

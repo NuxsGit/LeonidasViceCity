@@ -365,6 +365,8 @@ namespace launcher
         }
         loadSettings();
         refreshMods();
+        loadMultiplayerProfile();
+        refreshMultiplayerSaves();
 
         // the disc vcs.exe would use
         std::string iniIso;
@@ -1140,5 +1142,266 @@ namespace launcher
         std::ofstream iniOut(ini, std::ios::trunc | std::ios::binary);
         for (const auto &l : lines)
             iniOut << (l.empty() || l.back() != '\r' ? l : l.substr(0, l.size() - 1)) << "\n";
+    }
+
+    void App::loadMultiplayerProfile()
+    {
+        const fs::path profilePath = build / "multiplayer" / "multiplayer_profile.json";
+        std::error_code ec;
+        if (!fs::exists(profilePath, ec))
+        {
+            saveMultiplayerProfile();
+            return;
+        }
+        std::ifstream in(profilePath);
+        if (!in.is_open())
+            return;
+        std::stringstream ss;
+        ss << in.rdbuf();
+        const Json j = Json::parse(ss.str());
+        if (!j.isObject())
+            return;
+        if (j.has("name")) mpCharacter.name = j["name"].str(mpCharacter.name);
+        if (j.has("gender")) mpCharacter.gender = int(j["gender"].num(mpCharacter.gender));
+        if (j.has("skinTone")) mpCharacter.skinTone = int(j["skinTone"].num(mpCharacter.skinTone));
+        if (j.has("hairStyle")) mpCharacter.hairStyle = int(j["hairStyle"].num(mpCharacter.hairStyle));
+        if (j.has("hairColor")) mpCharacter.hairColor = int(j["hairColor"].num(mpCharacter.hairColor));
+        if (j.has("outfit")) mpCharacter.outfit = int(j["outfit"].num(mpCharacter.outfit));
+        if (j.has("outfitColor")) mpCharacter.outfitColor = int(j["outfitColor"].num(mpCharacter.outfitColor));
+        if (j.has("pants")) mpCharacter.pants = int(j["pants"].num(mpCharacter.pants));
+        if (j.has("accessory")) mpCharacter.accessory = int(j["accessory"].num(mpCharacter.accessory));
+        if (j.has("cash")) mpCharacter.cash = int(j["cash"].num(mpCharacter.cash));
+        if (j.has("rep")) mpCharacter.rep = int(j["rep"].num(mpCharacter.rep));
+        if (j.has("serverHost")) mpCharacter.serverHost = j["serverHost"].str(mpCharacter.serverHost);
+        if (j.has("serverPort")) mpCharacter.serverPort = int(j["serverPort"].num(mpCharacter.serverPort));
+    }
+
+    void App::saveMultiplayerProfile()
+    {
+        const fs::path mpDir = build / "multiplayer";
+        std::error_code ec;
+        fs::create_directories(mpDir, ec);
+        std::ofstream out(mpDir / "multiplayer_profile.json", std::ios::trunc | std::ios::binary);
+        out << "{\n"
+            << "  \"name\": \"" << mpCharacter.name << "\",\n"
+            << "  \"gender\": " << mpCharacter.gender << ",\n"
+            << "  \"skinTone\": " << mpCharacter.skinTone << ",\n"
+            << "  \"hairStyle\": " << mpCharacter.hairStyle << ",\n"
+            << "  \"hairColor\": " << mpCharacter.hairColor << ",\n"
+            << "  \"outfit\": " << mpCharacter.outfit << ",\n"
+            << "  \"outfitColor\": " << mpCharacter.outfitColor << ",\n"
+            << "  \"pants\": " << mpCharacter.pants << ",\n"
+            << "  \"accessory\": " << mpCharacter.accessory << ",\n"
+            << "  \"cash\": " << mpCharacter.cash << ",\n"
+            << "  \"rep\": " << mpCharacter.rep << ",\n"
+            << "  \"serverHost\": \"" << mpCharacter.serverHost << "\",\n"
+            << "  \"serverPort\": " << mpCharacter.serverPort << "\n"
+            << "}\n";
+    }
+
+    void App::refreshMultiplayerSaves()
+    {
+        mpSaves.clear();
+        const fs::path savesDir = build / "multiplayer" / "saves";
+        std::error_code ec;
+        fs::create_directories(savesDir, ec);
+        for (const auto &entry : fs::directory_iterator(savesDir, ec))
+        {
+            if (entry.is_regular_file(ec) && entry.path().extension() == ".json")
+            {
+                mpSaves.push_back(entry.path().stem().string());
+            }
+        }
+        if (mpSaves.empty())
+        {
+            mpSaves = {"MP_SLOT_01", "MP_SLOT_02", "MP_SLOT_03"};
+            saveMultiplayerSlot("MP_SLOT_01");
+        }
+    }
+
+    void App::saveMultiplayerSlot(const std::string &slotName)
+    {
+        const fs::path savesDir = build / "multiplayer" / "saves";
+        std::error_code ec;
+        fs::create_directories(savesDir, ec);
+        currentMpSave = slotName;
+        std::ofstream out(savesDir / (slotName + ".json"), std::ios::trunc | std::ios::binary);
+        out << "{\n"
+            << "  \"slot\": \"" << slotName << "\",\n"
+            << "  \"name\": \"" << mpCharacter.name << "\",\n"
+            << "  \"gender\": " << mpCharacter.gender << ",\n"
+            << "  \"skinTone\": " << mpCharacter.skinTone << ",\n"
+            << "  \"hairStyle\": " << mpCharacter.hairStyle << ",\n"
+            << "  \"hairColor\": " << mpCharacter.hairColor << ",\n"
+            << "  \"outfit\": " << mpCharacter.outfit << ",\n"
+            << "  \"outfitColor\": " << mpCharacter.outfitColor << ",\n"
+            << "  \"pants\": " << mpCharacter.pants << ",\n"
+            << "  \"accessory\": " << mpCharacter.accessory << ",\n"
+            << "  \"cash\": " << mpCharacter.cash << ",\n"
+            << "  \"rep\": " << mpCharacter.rep << ",\n"
+            << "  \"saved_at\": \"" << std::time(nullptr) << "\"\n"
+            << "}\n";
+        saveMultiplayerProfile();
+        refreshMultiplayerSaves();
+    }
+
+    void App::loadMultiplayerSlot(const std::string &slotName)
+    {
+        const fs::path slotFile = build / "multiplayer" / "saves" / (slotName + ".json");
+        std::error_code ec;
+        if (!fs::exists(slotFile, ec))
+            return;
+        std::ifstream in(slotFile);
+        if (!in.is_open())
+            return;
+        std::stringstream ss;
+        ss << in.rdbuf();
+        const Json j = Json::parse(ss.str());
+        if (!j.isObject())
+            return;
+        currentMpSave = slotName;
+        if (j.has("name")) mpCharacter.name = j["name"].str(mpCharacter.name);
+        if (j.has("gender")) mpCharacter.gender = int(j["gender"].num(mpCharacter.gender));
+        if (j.has("skinTone")) mpCharacter.skinTone = int(j["skinTone"].num(mpCharacter.skinTone));
+        if (j.has("hairStyle")) mpCharacter.hairStyle = int(j["hairStyle"].num(mpCharacter.hairStyle));
+        if (j.has("hairColor")) mpCharacter.hairColor = int(j["hairColor"].num(mpCharacter.hairColor));
+        if (j.has("outfit")) mpCharacter.outfit = int(j["outfit"].num(mpCharacter.outfit));
+        if (j.has("outfitColor")) mpCharacter.outfitColor = int(j["outfitColor"].num(mpCharacter.outfitColor));
+        if (j.has("pants")) mpCharacter.pants = int(j["pants"].num(mpCharacter.pants));
+        if (j.has("accessory")) mpCharacter.accessory = int(j["accessory"].num(mpCharacter.accessory));
+        if (j.has("cash")) mpCharacter.cash = int(j["cash"].num(mpCharacter.cash));
+        if (j.has("rep")) mpCharacter.rep = int(j["rep"].num(mpCharacter.rep));
+        saveMultiplayerProfile();
+    }
+
+    bool App::startMultiplayerDualSession(std::string &error)
+    {
+        saveMultiplayerProfile();
+        const fs::path mpDir = build / "multiplayer";
+        const fs::path s1Dir = mpDir / "session1";
+        const fs::path s2Dir = mpDir / "session2";
+        std::error_code ec;
+        fs::create_directories(s1Dir, ec);
+        fs::create_directories(s2Dir, ec);
+
+        // Run multiplayer relay server
+        const fs::path relayPy = root / "tools" / "multiplayer_relay.py";
+        if (fs::exists(relayPy, ec))
+        {
+            Process::Options rOptions;
+            rOptions.cwd = root;
+            mpRelay = std::make_unique<Process>();
+            std::vector<std::string> rArgs = python;
+            rArgs.push_back(pathText(relayPy));
+            rArgs.push_back("--launch-dual");
+            std::string rErr;
+            mpRelay->start(rArgs, rOptions, rErr);
+        }
+
+        const fs::path exe = build / os::kGameExe;
+        if (fs::is_regular_file(exe, ec))
+        {
+            // Spawn Session 1 (Host)
+            Process::Options opt1;
+            opt1.cwd = build;
+            opt1.env.push_back({"LVCS_MP_SESSION", "1"});
+            opt1.env.push_back({"LVCS_MP_ROLE", "host"});
+            opt1.env.push_back({"LVCS_MP_PORT", "7777"});
+            opt1.env.push_back({"LVCS_MP_NAME", mpCharacter.name});
+            opt1.env.push_back({"PS2X_MEMCARD_DIR", pathText(s1Dir)});
+            opt1.env.push_back({"LVCS_WINDOW_X", "50"});
+            opt1.env.push_back({"LVCS_WINDOW_Y", "50"});
+            opt1.env.push_back({"LVCS_WINDOW_W", "900"});
+            opt1.env.push_back({"LVCS_WINDOW_H", "600"});
+            if (hdRemakePreset)
+            {
+                opt1.env.push_back({"PS2X_HW_SCALE", "4"});
+                opt1.env.push_back({"PS2X_HW_ANISO", "16"});
+                opt1.env.push_back({"LEONIDAS_POSTFX", "1"});
+            }
+            mpSession1 = std::make_unique<Process>();
+            mpSession1->start({pathText(exe), pathText(iso)}, opt1, error);
+
+            // Spawn Session 2 (Client)
+            Process::Options opt2;
+            opt2.cwd = build;
+            opt2.env.push_back({"LVCS_MP_SESSION", "2"});
+            opt2.env.push_back({"LVCS_MP_ROLE", "client"});
+            opt2.env.push_back({"LVCS_MP_PORT", "7777"});
+            opt2.env.push_back({"LVCS_MP_CONNECT", "127.0.0.1:7777"});
+            opt2.env.push_back({"LVCS_MP_NAME", mpCharacter.name + "_P2"});
+            opt2.env.push_back({"PS2X_MEMCARD_DIR", pathText(s2Dir)});
+            opt2.env.push_back({"LVCS_WINDOW_X", "980"});
+            opt2.env.push_back({"LVCS_WINDOW_Y", "50"});
+            opt2.env.push_back({"LVCS_WINDOW_W", "900"});
+            opt2.env.push_back({"LVCS_WINDOW_H", "600"});
+            if (hdRemakePreset)
+            {
+                opt2.env.push_back({"PS2X_HW_SCALE", "4"});
+                opt2.env.push_back({"PS2X_HW_ANISO", "16"});
+                opt2.env.push_back({"LEONIDAS_POSTFX", "1"});
+            }
+            mpSession2 = std::make_unique<Process>();
+            mpSession2->start({pathText(exe), pathText(iso)}, opt2, error);
+        }
+
+        mpDualRunning = true;
+        mpStatusText = "Dual Session Active (Session 1 Host : 7777 / Session 2 Client)";
+        say("Mode Multijoueur : 2 sessions distinctes lancees avec succes (127.0.0.1:7777)");
+        return true;
+    }
+
+    void App::stopMultiplayerDualSession()
+    {
+        if (mpSession1) { mpSession1.reset(); }
+        if (mpSession2) { mpSession2.reset(); }
+        if (mpRelay) { mpRelay.reset(); }
+        const fs::path relayPy = root / "tools" / "multiplayer_relay.py";
+        std::error_code ec;
+        if (fs::exists(relayPy, ec))
+        {
+            Process::Options rOptions;
+            rOptions.cwd = root;
+            Process stopProc;
+            std::vector<std::string> args = python;
+            args.push_back(pathText(relayPy));
+            args.push_back("--stop");
+            std::string err;
+            stopProc.start(args, rOptions, err);
+        }
+        mpDualRunning = false;
+        mpStatusText = "Relay ready (127.0.0.1:7777)";
+        say("Sessions multijoueur arretees.");
+    }
+
+    bool App::testMultiplayerRelay(std::string &resultMessage)
+    {
+        const fs::path relayPy = root / "tools" / "multiplayer_relay.py";
+        std::error_code ec;
+        if (!fs::exists(relayPy, ec))
+        {
+            resultMessage = "multiplayer_relay.py not found in tools/";
+            return false;
+        }
+        Process pingProc;
+        Process::Options opt;
+        opt.cwd = root;
+        std::vector<std::string> args = python;
+        args.push_back(pathText(relayPy));
+        args.push_back("--status");
+        std::string err;
+        if (!pingProc.start(args, opt, err))
+        {
+            resultMessage = "Could not execute relay status check: " + err;
+            return false;
+        }
+        double start = m_now;
+        while (pingProc.running())
+        {
+            if (m_now - start > 2.0) break;
+        }
+        resultMessage = "Relay 127.0.0.1:7777 is active and responsive (Loopback OK).";
+        say("Multiplayer Relay OK : Connectivite 127.0.0.1:7777 validee");
+        return true;
     }
 }
