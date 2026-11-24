@@ -1,0 +1,16 @@
+{
+  "id": "vcs_plus_overhaul",
+  "name": "VCS+ Mega Overhaul (Ocean Beach Strip Club, VIP Lap Dance & GTA 6 Crowded City)",
+  "author": "Leonidas Vice City Community",
+  "version": "1.0.0",
+  "description": "Ajoute l'acces complet a l'interieur du Pole Position Club d'Ocean Beach avec cinematiques de danse privee VIP payante (style Vanilla Unicorn de GTA V), densite extreme de population a 1000% (rues bondees comme GTA 6) et affichage horizon de la carte a 1000% sans brouillard.",
+  "enabled_by_default": true,
+  "category": "gameplay",
+  "features": [
+    "Pole Position Club (Ocean Beach Strip Club) accessible a pied avec interieur complet",
+    "Danse privee VIP interactive payante ($50) avec angles de camera cinematiques et satisfaction +100%",
+    "Population extreme +1000% (x10 pietons et trafic) pour une ville ultra-vivante style GTA 6",
+    "Distance d'affichage horizon a 1000% (toute la carte de Vice City visible sans clipping)",
+    "Controle en direct via le menu F5 Trainer ou la touche E"
+  ]
+}

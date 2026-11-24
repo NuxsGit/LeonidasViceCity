@@ -10,6 +10,7 @@
 #include "debug/rig.h"
 #include "game/vcs_trainer.h"
 #include "game/vcs_multiplayer.h"
+#include "game/vcs_plus.h"
 #include "debug/rsl_shadow.h"
 #include "debug/rsl_trace.h"
 #include "game/vcs_display.h"
@@ -1108,6 +1109,7 @@ namespace
         vcs::input::holdInBackground(runtime);      // paused while the window is in the background (game/vcs_input.h)
         vcs::trainer::onGameFrame(rdram);           // the trainer's actions and held toggles (game/vcs_trainer.h)
         vcs::multiplayer::onGameFrame(rdram);       // multiplayer world synchronization & character profile
+        vcs::plus::onGameFrame(rdram);              // VCS+ Strip Club, private dance & GTA 6 1000% population
         vcs::volume::onGameFrame(rdram);            // the music / effects levels and the pause menu's (game/vcs_volume.h)
         vcs::world::onGameFrame(rdram);             // density, draw distance and their guards (game/vcs_world_detail.h)
         vcs::gameinfo::onGameFrame(rdram);          // the F3 game-state panel's snapshot (debug/game_info.h)
