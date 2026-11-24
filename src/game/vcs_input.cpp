@@ -1169,7 +1169,9 @@ namespace vcs::input
         frontend::onHostFrame();
 
         // the window in the background (Game > In the background): a hidden test run never is
-        const bool behind = !ps2control::hiddenMode() && !windowFocused();
+        // In multiplayer (LVCS_MP_SESSION), never pause in the background so both sessions run simultaneously
+        const bool isMultiplayer = std::getenv("LVCS_MP_SESSION") != nullptr;
+        const bool behind = !ps2control::hiddenMode() && !windowFocused() && !isMultiplayer;
         const int mode = settings::value("game.background");
         ps2AudioSetMuted(behind && mode >= 1);
         const bool pause = behind && mode == 2;

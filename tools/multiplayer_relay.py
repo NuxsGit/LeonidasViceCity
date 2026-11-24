@@ -109,6 +109,8 @@ class MultiplayerMemoryBridge(threading.Thread):
         # res1 format: "ok <ped> <x> <y> <z> <mission>"
         p1_parts = res1.split() if res1.startswith("ok") else []
         if len(p1_parts) < 5:
+            # Dismiss any start/loading screen prompts
+            send_cmd("press Return 150", port=47615)
             return
 
         p1_ped = int(p1_parts[1], 16)
@@ -118,6 +120,9 @@ class MultiplayerMemoryBridge(threading.Thread):
         res2 = send_cmd("player", port=47616)
         p2_parts = res2.split() if res2.startswith("ok") else []
         if len(p2_parts) < 5:
+            # Automatically dismiss loading / memory card check screen on Session 2
+            send_cmd("press Return 150", port=47616)
+            send_cmd("press Space 150", port=47616)
             return
 
         p2_ped = int(p2_parts[1], 16)

@@ -1284,6 +1284,14 @@ namespace launcher
         fs::create_directories(s1Dir, ec);
         fs::create_directories(s2Dir, ec);
 
+        // Pre-populate memory card directories so neither session blocks on memory card checks
+        const fs::path defaultMc = build / "mc0";
+        if (fs::exists(defaultMc, ec))
+        {
+            fs::copy(defaultMc, s1Dir, fs::copy_options::recursive | fs::copy_options::update_existing, ec);
+            fs::copy(defaultMc, s2Dir, fs::copy_options::recursive | fs::copy_options::update_existing, ec);
+        }
+
         // Run multiplayer relay server
         const fs::path relayPy = root / "tools" / "multiplayer_relay.py";
         if (fs::exists(relayPy, ec))
@@ -1315,6 +1323,7 @@ namespace launcher
         opt1.env.push_back({"PS2X_MEMCARD_DIR", pathText(s1Dir)});
         opt1.env.push_back({"PS2X_CONTROL", "1"});
         opt1.env.push_back({"PS2X_CONTROL_PORT", "47615"});
+        opt1.env.push_back({"VCS_BACKGROUND", "0"});
         opt1.env.push_back({"LVCS_WINDOW_X", "40"});
         opt1.env.push_back({"LVCS_WINDOW_Y", "60"});
         opt1.env.push_back({"LVCS_WINDOW_W", "880"});
@@ -1342,6 +1351,7 @@ namespace launcher
         opt2.env.push_back({"PS2X_MEMCARD_DIR", pathText(s2Dir)});
         opt2.env.push_back({"PS2X_CONTROL", "1"});
         opt2.env.push_back({"PS2X_CONTROL_PORT", "47616"});
+        opt2.env.push_back({"VCS_BACKGROUND", "0"});
         opt2.env.push_back({"LVCS_WINDOW_X", "940"});
         opt2.env.push_back({"LVCS_WINDOW_Y", "60"});
         opt2.env.push_back({"LVCS_WINDOW_W", "880"});
