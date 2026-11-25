@@ -1,4 +1,5 @@
 #include "game/vcs_multiplayer.h"
+#include "platform/platform.h"
 
 #include <algorithm>
 #include <chrono>
@@ -36,6 +37,7 @@ namespace vcs::multiplayer
         constexpr uint32_t kPlayerPed = 0x004E4910u;  // CWorld::Players[0].m_pPed
         constexpr uint32_t kClockHours = 0x004CD148u; // CClock: hours, minutes (bytes)
         constexpr uint32_t kPedPool = 0x00487A94u;    // -> CPool {entries, flags, size}
+        constexpr uint32_t kPedStride = 0xD20u;       // VCS PS2 ped pool struct size (3360 bytes)
 
         inline uint32_t rd32(const uint8_t *ram, uint32_t a)
         {
@@ -301,14 +303,27 @@ namespace vcs::multiplayer
             wr16(rdram, ped + 0x56, desiredModel);
         }
 
-        // 2. Read Local Player Coordinates and Clock
-        const float myX = rdf(rdram, ped + 0x30);
-        const float myY = rdf(rdram, ped + 0x34);
-        const float myZ = rdf(rdram, ped + 0x38);
+        // 2. Read Local Player Coordinates, Heading, and Clock
+        float myX = rdf(rdram, ped + 0x30);
+        float myY = rdf(rdram, ped + 0x34);
+        float myZ = rdf(rdram, ped + 0x38);
+        const float myHeading = rdf(rdram, ped + 0x420);
         const float myHealth = rdf(rdram, ped + 0x4E4);
         const float myArmour = rdf(rdram, ped + 0x4E8);
         const uint8_t myHour = rdram[kClockHours & kRamMask];
         const uint8_t myMinute = rdram[(kClockHours + 1) & kRamMask];
+
+        // Safety rescue: if player was dropped out in the ocean (-1004, -1435) from older buggy saves,
+        // recover back to solid ground in Ocean Beach outside Pole Position Club
+        if (myX < -800.0f && myY < -1200.0f)
+        {
+            myX = 482.0f;
+            myY = -1380.0f;
+            myZ = 10.5f;
+            wrf(rdram, ped + 0x30, myX);
+            wrf(rdram, ped + 0x34, myY);
+            wrf(rdram, ped + 0x38, myZ);
+        }
 
         // 3. Network Send (every 2 frames for smooth 60fps / 120fps sync)
         if (g_frameCount % 2 == 0
@@ -321,8 +336,8 @@ namespace vcs::multiplayer
         {
             char packet[256];
             int len = std::snprintf(packet, sizeof(packet),
-                                    "{\"session\":%d,\"name\":\"%s\",\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"model\":%d,\"hp\":%.1f,\"arm\":%.1f,\"hr\":%d,\"min\":%d}",
-                                    g_mySession, g_myName.c_str(), myX, myY, myZ, desiredModel, myHealth, myArmour, myHour, myMinute);
+                                    "{\"session\":%d,\"name\":\"%s\",\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"h\":%.2f,\"model\":%d,\"hp\":%.1f,\"arm\":%.1f,\"hr\":%d,\"min\":%d}",
+                                    g_mySession, g_myName.c_str(), myX, myY, myZ, myHeading, desiredModel, myHealth, myArmour, myHour, myMinute);
             sendto(g_sock, packet, len, 0, reinterpret_cast<const sockaddr *>(&g_relayAddr), sizeof(g_relayAddr));
         }
 
@@ -351,6 +366,7 @@ namespace vcs::multiplayer
             g_remotePlayer.x = parseNum("x", g_remotePlayer.x);
             g_remotePlayer.y = parseNum("y", g_remotePlayer.y);
             g_remotePlayer.z = parseNum("z", g_remotePlayer.z);
+            g_remotePlayer.heading = parseNum("h", g_remotePlayer.heading);
             g_remotePlayer.model = static_cast<int>(parseNum("model", g_remotePlayer.model));
             g_remotePlayer.health = parseNum("hp", 100.0f);
             g_remotePlayer.armour = parseNum("arm", 0.0f);
@@ -366,11 +382,36 @@ namespace vcs::multiplayer
             }
         }
 
-        // 5. Remote Player 2 Ped Synchronization
+        // 5. Automatic Initial Rendezvous & Manual Warp Hotkey
+        // For Client (Session 2), auto-warp next to Host when first received
+        static bool s_clientSpawnSynced = false;
+        if (!g_isHost && !s_clientSpawnSynced && g_remotePlayer.sessionId != 0 &&
+            (std::abs(g_remotePlayer.x) > 1.0f || std::abs(g_remotePlayer.y) > 1.0f))
+        {
+            s_clientSpawnSynced = true;
+            wrf(rdram, ped + 0x30, g_remotePlayer.x + 2.0f);
+            wrf(rdram, ped + 0x34, g_remotePlayer.y);
+            wrf(rdram, ped + 0x38, g_remotePlayer.z);
+            wrf(rdram, ped + 0x420, g_remotePlayer.heading);
+        }
+
+        // Manual Rendezvous Hotkey [F9] or [M]
+        if (platform::keyPressed(platform::KEY_F9) || platform::keyPressed('M'))
+        {
+            if (g_remotePlayer.sessionId != 0 && (std::abs(g_remotePlayer.x) > 1.0f || std::abs(g_remotePlayer.y) > 1.0f))
+            {
+                wrf(rdram, ped + 0x30, g_remotePlayer.x + 2.0f);
+                wrf(rdram, ped + 0x34, g_remotePlayer.y);
+                wrf(rdram, ped + 0x38, g_remotePlayer.z);
+                wrf(rdram, ped + 0x420, g_remotePlayer.heading);
+            }
+        }
+
+        // 6. Remote Player 2 Ped Synchronization
         // When remote player position is available, find or maintain the remote player ped entity in this world
         if (g_remotePlayer.sessionId != 0 && (std::abs(g_remotePlayer.x) > 0.1f || std::abs(g_remotePlayer.y) > 0.1f))
         {
-            // Search or allocate remote ped from the Ped Pool if not set
+            // Search or allocate remote ped from the Ped Pool
             if (g_remotePedAddr == 0)
             {
                 const uint32_t pool = rd32(rdram, kPedPool);
@@ -379,33 +420,57 @@ namespace vcs::multiplayer
                     const uint32_t entries = rd32(rdram, pool);
                     const uint32_t flags = rd32(rdram, pool + 4);
                     const int size = static_cast<int>(rd32(rdram, pool + 8));
-                    // Look for an entry that is not the local player
-                    for (int i = 1; i < std::min(size, 40); ++i)
+
+                    // First: try to find an already active pedestrian in the pool to take over
+                    for (int i = 1; i < std::min(size, 60); ++i)
                     {
-                        const uint32_t candidate = entries + i * 0x8D0u;
-                        if (candidate != ped && candidate)
+                        uint8_t flag = rdram[(flags + i) & kRamMask];
+                        if ((flag & 0x80) == 0) // active
                         {
-                            g_remotePedAddr = candidate;
-                            // Set model
-                            wr16(rdram, g_remotePedAddr + 0x56, static_cast<uint16_t>(g_remotePlayer.model ? g_remotePlayer.model : 1));
-                            // Proofs against death/despawn
-                            wr32(rdram, g_remotePedAddr + 0x484, 0xFFFFFFFFu);
-                            break;
+                            const uint32_t candidate = entries + i * kPedStride;
+                            if (candidate != ped && candidate)
+                            {
+                                g_remotePedAddr = candidate;
+                                break;
+                            }
                         }
+                    }
+
+                    // Second: if no active ped available, activate the first free slot
+                    if (g_remotePedAddr == 0)
+                    {
+                        for (int i = 1; i < std::min(size, 60); ++i)
+                        {
+                            uint8_t flag = rdram[(flags + i) & kRamMask];
+                            if ((flag & 0x80) != 0) // free
+                            {
+                                rdram[(flags + i) & kRamMask] = 1; // mark allocated
+                                g_remotePedAddr = entries + i * kPedStride;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (g_remotePedAddr != 0)
+                    {
+                        wr16(rdram, g_remotePedAddr + 0x56, static_cast<uint16_t>(g_remotePlayer.model ? g_remotePlayer.model : 1));
+                        wr32(rdram, g_remotePedAddr + 0x484, 0xFFFFFFFFu); // invulnerability proofs
                     }
                 }
             }
 
-            // Sync remote ped coordinates to remote player's live position
+            // Sync remote ped coordinates, heading, and model to remote player's live position
             if (g_remotePedAddr != 0)
             {
                 wrf(rdram, g_remotePedAddr + 0x30, g_remotePlayer.x);
                 wrf(rdram, g_remotePedAddr + 0x34, g_remotePlayer.y);
                 wrf(rdram, g_remotePedAddr + 0x38, g_remotePlayer.z);
+                wrf(rdram, g_remotePedAddr + 0x420, g_remotePlayer.heading);
                 if (g_remotePlayer.model > 0)
                 {
                     wr16(rdram, g_remotePedAddr + 0x56, static_cast<uint16_t>(g_remotePlayer.model));
                 }
+                wr32(rdram, g_remotePedAddr + 0x484, 0xFFFFFFFFu);
             }
         }
     }
