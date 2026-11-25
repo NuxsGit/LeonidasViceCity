@@ -43,6 +43,56 @@ def send_cmd(command, port=47615, timeout=0.1):
         return ""
 
 
+def scm_op(code, *args):
+    return code.to_bytes(2, "little") + b"".join(args)
+
+
+def scm_i(v):
+    v = int(v)
+    if v == 0:
+        return b"\x01"
+    if -128 <= v < 128:
+        return b"\x07" + (v & 0xFF).to_bytes(1, "little")
+    if -32768 <= v < 32768:
+        return b"\x08" + (v & 0xFFFF).to_bytes(2, "little")
+    return b"\x06" + (v & 0xFFFFFFFF).to_bytes(4, "little")
+
+
+def scm_f(v):
+    return b"\x09" + struct.pack("<f", float(v))
+
+
+def scm_b(v):
+    return scm_i(1 if v else 0)
+
+
+def scm_local(n):
+    return bytes([0x0D + n])
+
+
+def make_spawn_char_scm(model, x, y, z):
+    """Generates SCM bytecode to spawn a fully initialized 3D ped via opcode 0x003E (CREATE_CHAR)."""
+    code = (
+        scm_op(0x0160, scm_i(model)) +  # REQUEST_MODEL
+        scm_op(0x0228) +                 # LOAD_ALL_MODELS_NOW
+        scm_op(0x003E, scm_i(4), scm_i(model), scm_f(x), scm_f(y), scm_f(z), scm_local(0)) +  # CREATE_CHAR
+        scm_op(0x01B1, scm_local(0), scm_b(True), scm_b(True), scm_b(True), scm_b(True), scm_b(True)) +  # PROOFS
+        scm_op(0x014B, scm_local(0), scm_i(1000)) +  # SET_CHAR_HEALTH
+        scm_op(0x0023)                               # TERMINATE_THIS_SCRIPT
+    )
+    return code.hex()
+
+
+def make_move_char_scm(handle, x, y, z, heading):
+    """Generates SCM bytecode to reposition a ped via 0x0044 (SET_CHAR_COORDINATES) & 0x00CF."""
+    code = (
+        scm_op(0x0044, scm_i(handle), scm_f(x), scm_f(y), scm_f(z)) +
+        scm_op(0x00CF, scm_i(handle), scm_f(heading)) +
+        scm_op(0x0023)
+    )
+    return code.hex()
+
+
 def get_character_model_id(gender, outfit):
     """Maps launcher editor gender and outfit to GTA VCS PS2 character models."""
     if gender == 1:
@@ -56,7 +106,7 @@ def get_character_model_id(gender, outfit):
         4: 4,   # Veloce Tracksuit
         5: 1,   # Casual Denim Shirt
     }
-    return outfit_map.get(outfit, 0)
+    return outfit_map.get(outfit, 2)
 
 
 class MultiplayerMemoryBridge(threading.Thread):
@@ -68,8 +118,11 @@ class MultiplayerMemoryBridge(threading.Thread):
         self.s1_ped = 0
         self.s2_ped = 0
         self.s1_remote_ped = 0
+        self.s1_remote_handle = 0
+        self.s1_spawn_time = 0.0
         self.s2_remote_ped = 0
-        self.s2_spawn_synced = False
+        self.s2_remote_handle = 0
+        self.s2_spawn_time = 0.0
 
     def run(self):
         print("[LVCS-MP Bridge] Memory bridge active: monitoring Session 1 (47615) & Session 2 (47616)...")
@@ -148,41 +201,115 @@ class MultiplayerMemoryBridge(threading.Thread):
         m2_bytes = m2_hex[2:4] + m2_hex[0:2]
         send_cmd(f"poke 0x{p2_ped + 0x56:08x} {m2_bytes}", port=47616)
 
-        # 4. In Session 1: Place / move Player 2's ped entity at (x2, y2, z2)
-        if self.s1_remote_ped == 0:
-            pool_res = send_cmd("peek 0x00487A94 12", port=47615)
-            if pool_res.startswith("ok"):
-                raw_hex = pool_res[3:].strip()
-                if len(raw_hex) >= 16:
-                    entries_addr = int("".join(reversed([raw_hex[i:i+2] for i in range(0, 8, 2)])), 16)
-                    flags_addr = int("".join(reversed([raw_hex[i:i+2] for i in range(8, 16, 2)])), 16)
-                    self.s1_remote_ped = entries_addr + 1 * 0xD20
-                    send_cmd(f"poke 0x{flags_addr + 1:08x} 01", port=47615) # mark ped slot 1 active
+        # 4. In Session 1: Place / move Player 2's 3D ped entity at (x2, y2, z2)
+        # Verify if existing remote ped is valid and has its RenderWare clump active
+        if self.s1_remote_handle and self.s1_remote_ped:
+            clump_res = send_cmd(f"peek 0x{self.s1_remote_ped + 0x18:08x} 4", port=47615)
+            if not clump_res.startswith("ok") or clump_res[3:].strip() == "00000000":
+                self.s1_remote_handle = 0
+                self.s1_remote_ped = 0
 
-        if self.s1_remote_ped:
-            # Set coordinates to Session 2's live position
+        now = time.time()
+        if self.s1_remote_handle == 0 and (now - self.s1_spawn_time) > 2.0:
+            self.s1_spawn_time = now
+            spawn_hex = make_spawn_char_scm(m2 if m2 > 0 else 2, x2, y2, z2)
+            res = send_cmd(f"scm {spawn_hex}", port=47615)
+            if res.startswith("ok"):
+                parts = res.split()
+                if len(parts) >= 2:
+                    slot_addr = int(parts[1], 16)
+                    handle_res = send_cmd(f"peek 0x{slot_addr + 0x54:08x} 4", port=47615)
+                    if handle_res.startswith("ok"):
+                        h_hex = handle_res[3:].strip()
+                        if len(h_hex) >= 8:
+                            handle = struct.unpack("<I", bytes.fromhex(h_hex[:8]))[0]
+                            if handle != 0:
+                                self.s1_remote_handle = handle
+                                pool_res = send_cmd("peek 0x00487A94 4", port=47615)
+                                if pool_res.startswith("ok"):
+                                    p_hex = pool_res[3:].strip()
+                                    if len(p_hex) >= 8:
+                                        entries = struct.unpack("<I", bytes.fromhex(p_hex[:8]))[0]
+                                        self.s1_remote_ped = entries + (handle >> 8) * 0xD20
+                                        print(f"[LVCS-MP Bridge] Session 1: Spawned 3D ped handle=0x{handle:04x} addr=0x{self.s1_remote_ped:08x}")
+
+        # Fetch Player 2's heading
+        h2 = 0.0
+        h2_res = send_cmd(f"peekf 0x{p2_ped + 0x420:08x} 1", port=47616)
+        if h2_res.startswith("ok") and len(h2_res.split()) >= 2:
+            try:
+                h2 = float(h2_res.split()[1])
+            except ValueError:
+                pass
+
+        if self.s1_remote_ped and self.s1_remote_handle:
+            # Check distance for large relocation vs smooth interpolation
+            cur1_res = send_cmd(f"peekf 0x{self.s1_remote_ped + 0x30:08x} 3", port=47615)
+            if cur1_res.startswith("ok") and len(cur1_res.split()) >= 4:
+                try:
+                    cx = float(cur1_res.split()[1])
+                    cy = float(cur1_res.split()[2])
+                    cz = float(cur1_res.split()[3])
+                    if (x2 - cx) ** 2 + (y2 - cy) ** 2 + (z2 - cz) ** 2 > 4.0:
+                        send_cmd(f"scm {make_move_char_scm(self.s1_remote_handle, x2, y2, z2, h2)}", port=47615)
+                except ValueError:
+                    pass
             send_cmd(f"pokef 0x{self.s1_remote_ped + 0x30:08x} {x2:.3f} {y2:.3f} {z2:.3f}", port=47615)
-            # Set model to Player 2's chosen character model
-            send_cmd(f"poke 0x{self.s1_remote_ped + 0x56:08x} {m2_bytes}", port=47615)
-            # Invulnerable / prevent despawn
+            send_cmd(f"pokef 0x{self.s1_remote_ped + 0x420:08x} {h2:.3f}", port=47615)
             send_cmd(f"poke 0x{self.s1_remote_ped + 0x484:08x} ffffffff", port=47615)
 
-        # 5. In Session 2: Place / move Player 1's ped entity at (x1, y1, z1)
-        if self.s2_remote_ped == 0:
-            pool_res = send_cmd("peek 0x00487A94 12", port=47616)
-            if pool_res.startswith("ok"):
-                raw_hex = pool_res[3:].strip()
-                if len(raw_hex) >= 16:
-                    entries_addr = int("".join(reversed([raw_hex[i:i+2] for i in range(0, 8, 2)])), 16)
-                    flags_addr = int("".join(reversed([raw_hex[i:i+2] for i in range(8, 16, 2)])), 16)
-                    self.s2_remote_ped = entries_addr + 1 * 0xD20
-                    send_cmd(f"poke 0x{flags_addr + 1:08x} 01", port=47616) # mark ped slot 1 active
+        # 5. In Session 2: Place / move Player 1's 3D ped entity at (x1, y1, z1)
+        if self.s2_remote_handle and self.s2_remote_ped:
+            clump_res = send_cmd(f"peek 0x{self.s2_remote_ped + 0x18:08x} 4", port=47616)
+            if not clump_res.startswith("ok") or clump_res[3:].strip() == "00000000":
+                self.s2_remote_handle = 0
+                self.s2_remote_ped = 0
 
-        if self.s2_remote_ped:
-            # Set coordinates to Session 1's live position
+        if self.s2_remote_handle == 0 and (now - self.s2_spawn_time) > 2.0:
+            self.s2_spawn_time = now
+            spawn_hex = make_spawn_char_scm(m1 if m1 > 0 else 2, x1, y1, z1)
+            res = send_cmd(f"scm {spawn_hex}", port=47616)
+            if res.startswith("ok"):
+                parts = res.split()
+                if len(parts) >= 2:
+                    slot_addr = int(parts[1], 16)
+                    handle_res = send_cmd(f"peek 0x{slot_addr + 0x54:08x} 4", port=47616)
+                    if handle_res.startswith("ok"):
+                        h_hex = handle_res[3:].strip()
+                        if len(h_hex) >= 8:
+                            handle = struct.unpack("<I", bytes.fromhex(h_hex[:8]))[0]
+                            if handle != 0:
+                                self.s2_remote_handle = handle
+                                pool_res = send_cmd("peek 0x00487A94 4", port=47616)
+                                if pool_res.startswith("ok"):
+                                    p_hex = pool_res[3:].strip()
+                                    if len(p_hex) >= 8:
+                                        entries = struct.unpack("<I", bytes.fromhex(p_hex[:8]))[0]
+                                        self.s2_remote_ped = entries + (handle >> 8) * 0xD20
+                                        print(f"[LVCS-MP Bridge] Session 2: Spawned 3D ped handle=0x{handle:04x} addr=0x{self.s2_remote_ped:08x}")
+
+        # Fetch Player 1's heading
+        h1 = 0.0
+        h1_res = send_cmd(f"peekf 0x{p1_ped + 0x420:08x} 1", port=47615)
+        if h1_res.startswith("ok") and len(h1_res.split()) >= 2:
+            try:
+                h1 = float(h1_res.split()[1])
+            except ValueError:
+                pass
+
+        if self.s2_remote_ped and self.s2_remote_handle:
+            cur2_res = send_cmd(f"peekf 0x{self.s2_remote_ped + 0x30:08x} 3", port=47616)
+            if cur2_res.startswith("ok") and len(cur2_res.split()) >= 4:
+                try:
+                    cx = float(cur2_res.split()[1])
+                    cy = float(cur2_res.split()[2])
+                    cz = float(cur2_res.split()[3])
+                    if (x1 - cx) ** 2 + (y1 - cy) ** 2 + (z1 - cz) ** 2 > 4.0:
+                        send_cmd(f"scm {make_move_char_scm(self.s2_remote_handle, x1, y1, z1, h1)}", port=47616)
+                except ValueError:
+                    pass
             send_cmd(f"pokef 0x{self.s2_remote_ped + 0x30:08x} {x1:.3f} {y1:.3f} {z1:.3f}", port=47616)
-            # Set model to Player 1's chosen character model
-            send_cmd(f"poke 0x{self.s2_remote_ped + 0x56:08x} {m1_bytes}", port=47616)
+            send_cmd(f"pokef 0x{self.s2_remote_ped + 0x420:08x} {h1:.3f}", port=47616)
             send_cmd(f"poke 0x{self.s2_remote_ped + 0x484:08x} ffffffff", port=47616)
 
         # 6. Synchronize in-game world clock (Session 2 copies Session 1)

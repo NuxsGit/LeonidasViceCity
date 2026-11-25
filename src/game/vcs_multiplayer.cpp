@@ -1,5 +1,6 @@
 #include "game/vcs_multiplayer.h"
 #include "platform/platform.h"
+#include "debug/rig.h"
 
 #include <algorithm>
 #include <chrono>
@@ -116,8 +117,84 @@ namespace vcs::multiplayer
 
         // Remote peer state
         PlayerState g_remotePlayer;
+        uint32_t g_remotePedHandle = 0;
         uint32_t g_remotePedAddr = 0;
+        uint32_t g_spawnScript = 0;
+        uint32_t g_updateScript = 0;
+        int g_spawnedModel = -1;
         uint32_t g_frameCount = 0;
+
+        class Scm
+        {
+        public:
+            Scm &op(uint16_t code) { return put(code & 0xFF).put(code >> 8); }
+            Scm &i(int32_t v)
+            {
+                if (v == 0)
+                    return put(0x01);
+                if (v >= -128 && v < 128)
+                    return put(0x07).put(static_cast<uint8_t>(v));
+                if (v >= -32768 && v < 32768)
+                    return put(0x08).put(v & 0xFF).put((v >> 8) & 0xFF);
+                put(0x06);
+                for (int k = 0; k < 4; ++k)
+                    put((static_cast<uint32_t>(v) >> (8 * k)) & 0xFF);
+                return *this;
+            }
+            Scm &f(float v)
+            {
+                uint32_t bits;
+                std::memcpy(&bits, &v, 4);
+                put(0x09);
+                for (int k = 0; k < 4; ++k)
+                    put((bits >> (8 * k)) & 0xFF);
+                return *this;
+            }
+            Scm &b(bool v) { return i(v ? 1 : 0); }
+            Scm &local(int n) { return put(static_cast<uint8_t>(0x0D + n)); }
+            std::vector<uint8_t> finished() const
+            {
+                std::vector<uint8_t> out = code;
+                out.push_back(0x23);
+                out.push_back(0x00);
+                return out;
+            }
+
+        private:
+            Scm &put(uint32_t byte)
+            {
+                code.push_back(static_cast<uint8_t>(byte));
+                return *this;
+            }
+            std::vector<uint8_t> code;
+        };
+
+        bool isRemotePedValid(const uint8_t *rdram, uint32_t handle, uint32_t addr)
+        {
+            if (!handle || !addr)
+                return false;
+            const uint32_t pool = rd32(rdram, kPedPool);
+            if (!pool)
+                return false;
+            const uint32_t entries = rd32(rdram, pool);
+            const uint32_t flags = rd32(rdram, pool + 4);
+            const uint32_t size = rd32(rdram, pool + 8);
+            const uint32_t slot = handle >> 8;
+            if (slot >= size || slot == 0)
+                return false;
+            const uint8_t flag = rdram[(flags + slot) & kRamMask];
+            if ((flag & 0x80) != 0) // Slot is freed
+                return false;
+            if ((flag & 0x7F) != (handle & 0x7F)) // Generation mismatch
+                return false;
+            if (addr != (entries + slot * kPedStride))
+                return false;
+            // The ped MUST have an initialized RenderWare clump (m_pRwClump != 0) to be rendered on screen
+            const uint32_t clump = rd32(rdram, addr + 0x18);
+            if (!clump)
+                return false;
+            return true;
+        }
 
         uint16_t getCharacterModelId(int gender, int outfit)
         {
@@ -395,75 +472,113 @@ namespace vcs::multiplayer
         }
 
         // 6. Remote Player 2 Ped Synchronization
-        // When remote player position is available, find or maintain the remote player ped entity in this world
+        // Ensure an actual RenderWare 3D ped is spawned through the SCM script engine (opcode 0x003E CREATE_CHAR)
+        // so that m_pRwClump, animation hierarchy, collision and CWorld sector registration are fully initialized.
         if (g_remotePlayer.sessionId != 0 && (std::abs(g_remotePlayer.x) > 0.1f || std::abs(g_remotePlayer.y) > 0.1f))
         {
-            // Search or allocate remote ped from the Ped Pool
-            if (g_remotePedAddr == 0)
+            // Verify if existing remote ped is still alive and has its clump intact
+            if (g_remotePedHandle != 0 && !isRemotePedValid(rdram, g_remotePedHandle, g_remotePedAddr))
             {
-                const uint32_t pool = rd32(rdram, kPedPool);
-                if (pool)
+                g_remotePedHandle = 0;
+                g_remotePedAddr = 0;
+                g_spawnedModel = -1;
+            }
+
+            // Check completion of pending spawn script
+            if (g_spawnScript != 0)
+            {
+                if (!vcs::rig::scriptActive(rdram, g_spawnScript))
                 {
-                    const uint32_t entries = rd32(rdram, pool);
-                    const uint32_t flags = rd32(rdram, pool + 4);
-                    const int size = static_cast<int>(rd32(rdram, pool + 8));
-
-                    // First: try to find an already active pedestrian in the pool to take over
-                    for (int i = 1; i < std::min(size, 60); ++i)
+                    // Terminated! Output ped handle is stored in local variable 0 (+0x54)
+                    const uint32_t handle = rd32(rdram, g_spawnScript + 0x54);
+                    if (handle != 0)
                     {
-                        uint8_t flag = rdram[(flags + i) & kRamMask];
-                        if ((flag & 0x80) == 0) // active
+                        const uint32_t pool = rd32(rdram, kPedPool);
+                        if (pool)
                         {
-                            const uint32_t candidate = entries + i * kPedStride;
-                            if (candidate != ped && candidate)
-                            {
-                                g_remotePedAddr = candidate;
-                                break;
-                            }
+                            const uint32_t entries = rd32(rdram, pool);
+                            const uint32_t slot = handle >> 8;
+                            g_remotePedHandle = handle;
+                            g_remotePedAddr = entries + slot * kPedStride;
+                            std::fprintf(stderr, "[LVCS-MP] 3D Remote Ped successfully spawned: handle=0x%04x at 0x%08x (model %d)\n",
+                                         handle, g_remotePedAddr, g_spawnedModel);
                         }
                     }
-
-                    // Second: if no active ped available, activate the first free slot
-                    if (g_remotePedAddr == 0)
-                    {
-                        for (int i = 1; i < std::min(size, 60); ++i)
-                        {
-                            uint8_t flag = rdram[(flags + i) & kRamMask];
-                            if ((flag & 0x80) != 0) // free
-                            {
-                                rdram[(flags + i) & kRamMask] = 1; // mark allocated
-                                g_remotePedAddr = entries + i * kPedStride;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (g_remotePedAddr != 0)
-                    {
-                        wr16(rdram, g_remotePedAddr + 0x56, static_cast<uint16_t>(g_remotePlayer.model ? g_remotePlayer.model : 1));
-                        wr32(rdram, g_remotePedAddr + 0x484, 0xFFFFFFFFu); // invulnerability proofs
-                    }
+                    g_spawnScript = 0;
                 }
             }
 
-            // Sync remote ped coordinates, heading, and model to remote player's live position
-            if (g_remotePedAddr != 0)
+            // Spawn remote character via SCM opcode 0x003E if not yet spawned
+            if (g_remotePedHandle == 0 && g_spawnScript == 0)
             {
-                wrf(rdram, g_remotePedAddr + 0x30, g_remotePlayer.x);
-                wrf(rdram, g_remotePedAddr + 0x34, g_remotePlayer.y);
-                wrf(rdram, g_remotePedAddr + 0x38, g_remotePlayer.z);
-                wrf(rdram, g_remotePedAddr + 0x420, g_remotePlayer.heading);
-                if (g_remotePlayer.model > 0)
+                const int spawnModel = (g_remotePlayer.model > 0) ? g_remotePlayer.model : 2;
+                g_spawnedModel = spawnModel;
+                Scm s;
+                s.op(0x0160).i(spawnModel); // REQUEST_MODEL
+                s.op(0x0228);               // LOAD_ALL_MODELS_NOW
+                s.op(0x003E).i(4).i(spawnModel).f(g_remotePlayer.x).f(g_remotePlayer.y).f(g_remotePlayer.z).local(0); // CREATE_CHAR
+                s.op(0x01B1).local(0).b(true).b(true).b(true).b(true).b(true); // SET_CHAR_PROOFS (invulnerable)
+                s.op(0x014B).local(0).i(1000); // SET_CHAR_HEALTH 1000
+                const std::vector<uint8_t> bytes = s.finished();
+                g_spawnScript = vcs::rig::startCodeScript(rdram, bytes.data(), bytes.size(), "mp_ped");
+            }
+
+            // Synchronize remote ped coordinates, heading, and animation velocity
+            if (g_remotePedHandle != 0 && g_remotePedAddr != 0)
+            {
+                const float curX = rdf(rdram, g_remotePedAddr + 0x30);
+                const float curY = rdf(rdram, g_remotePedAddr + 0x34);
+                const float curZ = rdf(rdram, g_remotePedAddr + 0x38);
+                const float dx = g_remotePlayer.x - curX;
+                const float dy = g_remotePlayer.y - curY;
+                const float dz = g_remotePlayer.z - curZ;
+                const float distSq = dx * dx + dy * dy + dz * dz;
+
+                // Sync outfit model if changed
+                if (g_remotePlayer.model > 0 && g_remotePlayer.model != g_spawnedModel)
                 {
                     wr16(rdram, g_remotePedAddr + 0x56, static_cast<uint16_t>(g_remotePlayer.model));
+                    g_spawnedModel = g_remotePlayer.model;
                 }
+
+                // If teleported or far away (> 2.0 meters), move via SET_CHAR_COORDINATES to maintain sector grid
+                if (distSq > 4.0f)
+                {
+                    if (g_updateScript == 0 || !vcs::rig::scriptActive(rdram, g_updateScript))
+                    {
+                        Scm u;
+                        u.op(0x0044).i(g_remotePedHandle).f(g_remotePlayer.x).f(g_remotePlayer.y).f(g_remotePlayer.z); // SET_CHAR_COORDINATES
+                        u.op(0x00CF).i(g_remotePedHandle).f(g_remotePlayer.heading); // SET_CHAR_HEADING
+                        const std::vector<uint8_t> ubytes = u.finished();
+                        g_updateScript = vcs::rig::startCodeScript(rdram, ubytes.data(), ubytes.size(), "mp_pos");
+                    }
+                }
+                else
+                {
+                    // Smooth frame-to-frame position and heading
+                    wrf(rdram, g_remotePedAddr + 0x30, g_remotePlayer.x);
+                    wrf(rdram, g_remotePedAddr + 0x34, g_remotePlayer.y);
+                    wrf(rdram, g_remotePedAddr + 0x38, g_remotePlayer.z);
+                    wrf(rdram, g_remotePedAddr + 0x420, g_remotePlayer.heading);
+                    // Movement speed for animation walking/running interpolation
+                    wrf(rdram, g_remotePedAddr + 0x140, dx * 0.5f);
+                    wrf(rdram, g_remotePedAddr + 0x144, dy * 0.5f);
+                }
+
+                // Invulnerability and health maintenance
                 wr32(rdram, g_remotePedAddr + 0x484, 0xFFFFFFFFu);
+                wrf(rdram, g_remotePedAddr + 0x4E4, 1000.0f);
             }
         }
     }
 
     void shutdown()
     {
+        g_remotePedHandle = 0;
+        g_remotePedAddr = 0;
+        g_spawnScript = 0;
+        g_updateScript = 0;
+        g_spawnedModel = -1;
 #if defined(_WIN32)
         if (g_sock != INVALID_SOCKET)
         {
