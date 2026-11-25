@@ -6,14 +6,17 @@ Le mod **VCS+** regroupe le top 10 des fonctionnalités les plus réclamées par
 
 ## 🏆 Top 10 des Fonctionnalités Intégrées
 
-### 1. 💃 Pole Position Club (Ocean Beach Strip Club) & Danse Privée VIP
-- **Entrée fluide** : Approchez-vous de la porte du Pole Position Club sur Ocean Beach (`X: 482, Y: -1380, Z: 10`) et appuyez sur **`E`**.
-- **Salon VIP & Danse Privée (style Vanilla Unicorn de GTA V)** :
-  - Avancez dans la cabine VIP.
-  - Appuyez sur **`E`** pour payer **$50** pour une danse privée exclusive.
-  - Déclenche une cinématique dynamique avec **4 angles de caméra cinématographiques** (contre-plongée, gros plan néon, orbite 360°, vue à l'épaule).
-  - Restaure instantanément votre vie et votre armure (**Satisfaction VIP +100%**).
-  - Quittez ou terminez à tout moment avec **`Espace`**.
+### 1. 💃 Pole Position Club (Ocean Beach Strip Club) & Danse Privée VIP (Style Vanilla Unicorn)
+- **Modèle intérieur répliqué de Vice City** :
+  - Entrée extérieure sur le trottoir d'Ocean Beach (`X: 482, Y: -1380, Z: 10`). Appuyez sur **`E`** pour charger l'intérieur complet (Salle principale, Bar, Scène disco avec barre de pole dance, Miroirs néons, Cabines VIP privées).
+  - Gestion native de la transition d'espace (`CGame::currArea` bascule automatiquement entre Area 0 et Area 1).
+- **Salon VIP & Danse Privée Interactive (style Vanilla Unicorn de GTA V)** :
+  - Entrez dans la cabine VIP et appuyez sur **`E`** pour commander une danse privée ($50).
+  - **Jauge d'Affection & Interaction [T]** : Appuyez sur **`T`** pour flirter et remplir la barre d'affection (`[##########] 100%`). À 100%, bonus permanent VIP santé & armure poussé à **150%** !
+  - **Animations procédurales sensuelles** : Mouvements de hanches fluides, ondulation du torse et rebond synchronisé sur la musique.
+  - **4 Angles de caméra cinématographiques** : Vue subjective VIP, plan américain néon, contre-plongée et orbite 360°.
+  - **Textures & Tenues HD** : Tenues de scène en dentelle et bikini néon (`dancer_stage_lingerie.png`, `dancer_pole_outfit.png`), peau HD soyeuse (`dancer_body_skin.png`) et panneaux de miroirs biseautés (`strip_club_wall_mirrors.png`).
+  - Quittez ou terminez à tout moment avec **`Espace`**, et ressortez du club avec **`E`**.
 
 ### 2. 🚶 Population Urbaine Extrême à +1000% (Style GTA 6)
 - Multiplicateur de piétons poussé à **1000% (x10)** et trafic à **500% (x5)**.
@@ -58,5 +61,6 @@ Le mod **VCS+** regroupe le top 10 des fonctionnalités les plus réclamées par
 | **Saut Hydraulique** | `Espace` | `Croix (A)` |
 | **Ralenti Bullet Time** | `Ctrl + B` | `R3` |
 | **Appeler Gardes du Corps** | `Touche G` | `D-Pad Haut` |
-| **Entrer / Payer Danse VIP** | `Touche E` | `D-Pad Droit` |
+| **Entrer / Sortir / Payer Danse VIP** | `Touche E` | `D-Pad Droit` |
+| **Flirter en Danse Privée VIP** | `Touche T` | `Carré (X)` |
 | **Quitter Danse VIP** | `Espace` | `Rond (B)` |

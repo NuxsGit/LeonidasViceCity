@@ -17,13 +17,14 @@ namespace vcs::plus
         constexpr uint32_t kPlayerPed = 0x004E4910u;  // CWorld::Players[0].m_pPed
         constexpr uint32_t kMoney = 0x004E49CCu;      // CPlayerInfo money
         constexpr uint32_t kCamera = 0x006F44D0u;     // TheCamera
+        constexpr uint32_t kCurrArea = 0x00489F7Cu;   // CGame::currArea (0 outdoors, 1 club interior)
         constexpr uint32_t kCarFactor = 0x0048A680u; // float 0.7
         constexpr uint32_t kPedFactor = 0x0048A67Cu; // float 0.4
         constexpr uint32_t kLodScale = 0x004887F8u;  // float 1.0
         constexpr uint32_t kPedVehicle = 0x480u;      // vehicle ptr (0 on foot)
         constexpr uint32_t kPedHealth = 0x4E4u;
         constexpr uint32_t kPedArmour = 0x4E8u;
-        constexpr uint32_t kCarVelocity = 0x140u;    // velocity vector (units per 1/50 s)
+        constexpr uint32_t kCarVelocity = 0x140u;    // velocity vector
         constexpr uint32_t kPedPool = 0x00487A94u;
 
         inline uint32_t rd32(const uint8_t *ram, uint32_t a)
@@ -62,38 +63,43 @@ namespace vcs::plus
             std::memcpy(ram + (a & kRamMask), &v, 4);
         }
 
-        // Ocean Beach Pole Position Strip Club coordinates
+        // Ocean Beach Pole Position Strip Club Coordinates (Identique a GTA Vice City)
+        // Exterior Entrance (Ocean Beach Sidewalk)
         constexpr float kClubExtX = 482.0f;
         constexpr float kClubExtY = -1380.0f;
         constexpr float kClubExtZ = 10.0f;
 
+        // Interior Main Lounge (Bar, Stage with Pole, Synthwave Disco Floor)
         constexpr float kClubIntX = -1004.0f;
         constexpr float kClubIntY = -1435.0f;
         constexpr float kClubIntZ = 12.0f;
 
+        // Private VIP Booth (Vanilla Unicorn style Private Dance Room)
         constexpr float kVipBoothX = -1008.0f;
         constexpr float kVipBoothY = -1440.0f;
         constexpr float kVipBoothZ = 12.0f;
 
-        // VCS+ Toggles
+        // VCS+ State
         bool g_gta6Pop = true;
         bool g_ultraHorizon = true;
         bool g_infiniteSwim = true;
         bool g_bulletTime = false;
         bool g_firstPersonCam = false;
+
         bool g_inClub = false;
         bool g_privateDance = false;
-
         float g_danceTimer = 0.0f;
         float g_danceCycle = 0.0f;
+        float g_vipAffection = 0.0f; // 0.0f to 100.0f (Vanilla Unicorn Affection Meter)
         int g_camAngle = 0;
+
         uint32_t g_dancerPedAddr = 0;
         uint32_t g_guardPedAddr[2] = {0, 0};
 
-        float g_nitroFlicker = 0.0f;
         float g_currentSpeedKmh = 0.0f;
         std::string g_hudPrompt;
         std::string g_speedometerStr;
+        std::string g_vipAffectionStr;
 
         float dist3D(float x1, float y1, float z1, float x2, float y2, float z2)
         {
@@ -105,23 +111,23 @@ namespace vcs::plus
         {
             if (!dancerAddr) return;
 
-            // Rhythmic hip sway & shoulder roll
-            float swayX = std::sin(time * 3.2f) * 0.22f;
-            float swayY = std::cos(time * 3.2f) * 0.15f;
-            float bounceZ = std::abs(std::sin(time * 6.4f)) * 0.05f;
+            // Seductive rhythmic hip swaying & torso body wave
+            float swayX = std::sin(time * 3.4f) * 0.25f;
+            float swayY = std::cos(time * 3.4f) * 0.18f;
+            float bounceZ = std::abs(std::sin(time * 6.8f)) * 0.06f;
 
-            // Base position: 1.4m directly in front of the seated player in the VIP booth
-            float dancerBaseX = kVipBoothX + 0.3f;
-            float dancerBaseY = kVipBoothY + 1.4f;
+            // Base position: directly in front of the seated player in the VIP lounge
+            float dancerBaseX = kVipBoothX + 0.35f;
+            float dancerBaseY = kVipBoothY + 1.35f;
             float dancerBaseZ = kVipBoothZ;
 
             wrf(rdram, dancerAddr + 0x30, dancerBaseX + swayX);
             wrf(rdram, dancerAddr + 0x34, dancerBaseY + swayY);
             wrf(rdram, dancerAddr + 0x38, dancerBaseZ + bounceZ);
 
-            // Dancer model index (Model 14: Vice City Bikini / Club performer)
+            // Dancer Model Index (Model 14 / 22: Stage Club Performer)
             wr16(rdram, dancerAddr + 0x56, 14);
-            // Invincibility
+            // Proofs / invincibility
             wr32(rdram, dancerAddr + 0x484, 0xFFFFFFFFu);
         }
 
@@ -139,18 +145,15 @@ namespace vcs::plus
 
                 if (veh)
                 {
-                    // Bodyguards board the vehicle with Vic Vance
                     wr32(rdram, guard + kPedVehicle, veh);
                 }
                 else
                 {
-                    // Escort formation: Guard 0 on right flank, Guard 1 on left flank
                     float targetX = px + (i == 0 ? 1.8f : -1.8f);
                     float targetY = py - 1.8f;
                     float gx = rdf(rdram, guard + 0x30);
                     float gy = rdf(rdram, guard + 0x34);
 
-                    // Smooth walking interpolation
                     wrf(rdram, guard + 0x30, gx + (targetX - gx) * 0.1f);
                     wrf(rdram, guard + 0x34, gy + (targetY - gy) * 0.1f);
                     wrf(rdram, guard + 0x38, pz);
@@ -167,6 +170,36 @@ namespace vcs::plus
     }
 
     bool isPrivateDanceActive() { return g_privateDance; }
+    bool isInClub() { return g_inClub; }
+
+    void enterClub(uint8_t *rdram)
+    {
+        g_inClub = true;
+        const uint32_t ped = rd32(rdram, kPlayerPed);
+        if (ped)
+        {
+            // Switch area to Club Interior (Area 1)
+            wr32(rdram, kCurrArea, 1);
+            wrf(rdram, ped + 0x30, kClubIntX);
+            wrf(rdram, ped + 0x34, kClubIntY);
+            wrf(rdram, ped + 0x38, kClubIntZ);
+        }
+    }
+
+    void exitClub(uint8_t *rdram)
+    {
+        g_inClub = false;
+        g_privateDance = false;
+        const uint32_t ped = rd32(rdram, kPlayerPed);
+        if (ped)
+        {
+            // Switch area back to Outdoors (Area 0)
+            wr32(rdram, kCurrArea, 0);
+            wrf(rdram, ped + 0x30, kClubExtX + 2.0f);
+            wrf(rdram, ped + 0x34, kClubExtY);
+            wrf(rdram, ped + 0x38, kClubExtZ);
+        }
+    }
 
     void startPrivateDance(uint8_t *rdram)
     {
@@ -178,6 +211,7 @@ namespace vcs::plus
         const uint32_t ped = rd32(rdram, kPlayerPed);
         if (ped)
         {
+            wr32(rdram, kCurrArea, 1);
             wrf(rdram, ped + 0x30, kVipBoothX);
             wrf(rdram, ped + 0x34, kVipBoothY);
             wrf(rdram, ped + 0x38, kVipBoothZ);
@@ -186,10 +220,11 @@ namespace vcs::plus
             if (money >= 50)
                 wr32(rdram, kMoney, static_cast<uint32_t>(money - 50));
 
+            g_vipAffection = std::min(100.0f, g_vipAffection + 25.0f);
             wrf(rdram, ped + kPedHealth, 100.0f);
             wrf(rdram, ped + kPedArmour, 100.0f);
 
-            // Allocate or identify VIP dancer ped in pool
+            // Locate dancer ped in pool
             if (g_dancerPedAddr == 0)
             {
                 const uint32_t pool = rd32(rdram, kPedPool);
@@ -218,21 +253,34 @@ namespace vcs::plus
         g_dancerPedAddr = 0;
     }
 
+    void flirtDancer(uint8_t *rdram)
+    {
+        if (!g_privateDance) return;
+        g_vipAffection = std::min(100.0f, g_vipAffection + 15.0f);
+
+        const uint32_t ped = rd32(rdram, kPlayerPed);
+        if (ped)
+        {
+            if (g_vipAffection >= 100.0f)
+            {
+                // Permanent VIP Max Boost: 150 HP + 150 Armour
+                wrf(rdram, ped + kPedHealth, 150.0f);
+                wrf(rdram, ped + kPedArmour, 150.0f);
+            }
+        }
+    }
+
     void setGta6Population(bool enable) { g_gta6Pop = enable; }
     bool isGta6PopulationEnabled() { return g_gta6Pop; }
 
     void setUltraHorizon(bool enable) { g_ultraHorizon = enable; }
     bool isUltraHorizonEnabled() { return g_ultraHorizon; }
 
-    void toggleFirstPersonCam()
-    {
-        g_firstPersonCam = !g_firstPersonCam;
-    }
+    void toggleFirstPersonCam() { g_firstPersonCam = !g_firstPersonCam; }
 
     void toggleBulletTime(uint8_t *rdram)
     {
         g_bulletTime = !g_bulletTime;
-        // CTimer::ms_fTimeStep (0x004CD110u): 1.0f = normal, 0.25f = slow-mo bullet time
         wrf(rdram, 0x004CD110u, g_bulletTime ? 0.25f : 1.0f);
     }
 
@@ -243,7 +291,6 @@ namespace vcs::plus
         const uint32_t veh = rd32(rdram, ped + kPedVehicle);
         if (!veh) return;
 
-        // Apply forward rocket boost to car velocity vector
         float vx = rdf(rdram, veh + kCarVelocity);
         float vy = rdf(rdram, veh + kCarVelocity + 4);
         float vz = rdf(rdram, veh + kCarVelocity + 8);
@@ -279,7 +326,6 @@ namespace vcs::plus
         const uint32_t entries = rd32(rdram, pool);
         const int size = static_cast<int>(rd32(rdram, pool + 8));
 
-        // Recruit 2 Vance Crime Family Henchmen
         int spawned = 0;
         for (int i = 1; i < std::min(size, 30) && spawned < 2; ++i)
         {
@@ -289,9 +335,7 @@ namespace vcs::plus
                 wrf(rdram, guard + 0x30, px + (spawned == 0 ? 1.5f : -1.5f));
                 wrf(rdram, guard + 0x34, py - 1.5f);
                 wrf(rdram, guard + 0x38, pz);
-                // Smart / Hood 80s Suit Models
                 wr16(rdram, guard + 0x56, spawned == 0 ? 2 : 5);
-                // Proofs
                 wr32(rdram, guard + 0x484, 0xFFFFFFFFu);
                 g_guardPedAddr[spawned] = guard;
                 ++spawned;
@@ -301,6 +345,7 @@ namespace vcs::plus
 
     std::string hudSpeedometer() { return g_speedometerStr; }
     std::string hudPrompt() { return g_hudPrompt; }
+    std::string hudVipAffection() { return g_vipAffectionStr; }
 
     void onGameFrame(uint8_t *rdram)
     {
@@ -310,8 +355,8 @@ namespace vcs::plus
         // 1. Extreme Population Multipliers (GTA 6 Crowded City +1000%)
         if (g_gta6Pop)
         {
-            wrf(rdram, kPedFactor, 4.0f);  // 10x pedestrian factor
-            wrf(rdram, kCarFactor, 3.5f);  // 5x car factor
+            wrf(rdram, kPedFactor, 4.0f);
+            wrf(rdram, kCarFactor, 3.5f);
         }
 
         // 2. Ultra Draw Distance (1000% No-Fog Horizon)
@@ -320,13 +365,13 @@ namespace vcs::plus
             wrf(rdram, kLodScale, 10.0f);
         }
 
-        // 3. Unlimited Swimming (No Drowning & Faster Sprint)
+        // 3. Unlimited Swimming
         if (g_infiniteSwim)
         {
             wrf(rdram, ped + kPedHealth, std::max(rdf(rdram, ped + kPedHealth), 100.0f));
         }
 
-        // 4. Vehicle Speedometer & Nitro Hotkey Check
+        // 4. Vehicle Speedometer & Nitro
         const uint32_t veh = rd32(rdram, ped + kPedVehicle);
         if (veh)
         {
@@ -341,13 +386,10 @@ namespace vcs::plus
             std::snprintf(sBuf, sizeof(sBuf), "%d km/h  |  %d mph  [NITRO: SHIFT]", kmh, mph);
             g_speedometerStr = sBuf;
 
-            // Shift key triggers Nitro Boost
             if (platform::keyDown(platform::KEY_LEFT_SHIFT) || platform::keyDown(platform::KEY_RIGHT_SHIFT))
             {
                 toggleNitro(rdram);
             }
-
-            // Hydraulic Bunny Hop with Spacebar
             if (platform::keyPressed(' ') || platform::keyPressed(platform::KEY_KP_ENTER))
             {
                 wrf(rdram, veh + kCarVelocity + 8, vz + 0.16f);
@@ -364,7 +406,7 @@ namespace vcs::plus
             toggleBulletTime(rdram);
         }
 
-        // 6. Bodyguards Hotkey (Press G on foot) & AI Escort Update
+        // 6. Bodyguards Hotkey (Press G on foot)
         if (platform::keyPressed('G') && !veh)
         {
             spawnBodyguards(rdram);
@@ -387,10 +429,7 @@ namespace vcs::plus
             g_hudPrompt = "POLE POSITION CLUB : Entrer dans le Strip Club [Appuyer sur E]";
             if (platform::keyPressed('E'))
             {
-                g_inClub = true;
-                wrf(rdram, ped + 0x30, kClubIntX);
-                wrf(rdram, ped + 0x34, kClubIntY);
-                wrf(rdram, ped + 0x38, kClubIntZ);
+                enterClub(rdram);
             }
         }
         else if (g_inClub && distToClubInt < 4.0f)
@@ -398,10 +437,7 @@ namespace vcs::plus
             g_hudPrompt = "POLE POSITION CLUB : Sortir vers Ocean Beach [Appuyer sur E]";
             if (platform::keyPressed('E'))
             {
-                g_inClub = false;
-                wrf(rdram, ped + 0x30, kClubExtX + 2.0f);
-                wrf(rdram, ped + 0x34, kClubExtY);
-                wrf(rdram, ped + 0x38, kClubExtZ);
+                exitClub(rdram);
             }
         }
         else if (g_inClub && distToVip < 4.0f && !g_privateDance)
@@ -413,19 +449,39 @@ namespace vcs::plus
             }
         }
 
-        // 8. Cinematic VIP Lap Dance & Procedural Dance Animation
+        // 8. Vanilla Unicorn Style Private Lap Dance Script
         if (g_privateDance)
         {
             g_danceTimer += 0.016f;
             g_danceCycle += 0.016f;
-            g_hudPrompt = "DANSE PRIVEE VIP (VCS+)  -  Satisfaction +100%  -  [Espace pour Quitter]";
 
+            // Flirt key: [T]
+            if (platform::keyPressed('T'))
+            {
+                flirtDancer(rdram);
+            }
+
+            // Extend dance: [E]
+            if (platform::keyPressed('E'))
+            {
+                startPrivateDance(rdram);
+            }
+
+            // Stop dance: [Space]
             if (platform::keyPressed(' '))
             {
                 stopPrivateDance(rdram);
             }
 
-            // Animate dancer ped procedural swaying and rhythm
+            // Update HUD prompt & Affection Gauge
+            char affBuf[128];
+            int bars = static_cast<int>(g_vipAffection / 10.0f);
+            std::string barStr = std::string(bars, '#') + std::string(10 - bars, '-');
+            std::snprintf(affBuf, sizeof(affBuf),
+                          "DANSE PRIVEE VIP  -  Affection: [%s] %d%%  -  [T] Flirter  [E] Payer $50  [Espace] Quitter",
+                          barStr.c_str(), static_cast<int>(g_vipAffection));
+            g_hudPrompt = affBuf;
+
             updateDancerAnimation(rdram, g_dancerPedAddr, g_danceCycle);
 
             if (g_danceTimer > 4.0f)
