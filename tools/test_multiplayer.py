@@ -21,6 +21,9 @@ from multiplayer_relay import (
     DEFAULT_PORT,
     MultiplayerRelayServer,
     check_status,
+    make_spawn_char_scm,
+    make_move_char_scm,
+    get_character_model_id,
 )
 
 
@@ -108,6 +111,50 @@ class TestMultiplayerSystem(unittest.TestCase):
             sock.close()
         finally:
             server.stop()
+
+    def test_scm_spawn_bytecode_generation(self):
+        # Model 2 (Smart Crockett Suit), coords (482.0, -1380.0, 10.5)
+        spawn_hex = make_spawn_char_scm(2, 482.0, -1380.0, 10.5)
+        spawn_bytes = bytes.fromhex(spawn_hex)
+        
+        # Must fit within rig kCodeMax (176 bytes)
+        self.assertLessEqual(len(spawn_bytes), 176)
+        
+        # Opcode 0x0160 = REQUEST_MODEL (60 01)
+        self.assertEqual(spawn_bytes[0:2], b"\x60\x01")
+        # Opcode 0x0228 = LOAD_ALL_MODELS_NOW (28 02)
+        self.assertIn(b"\x28\x02", spawn_bytes)
+        # Opcode 0x003E = CREATE_CHAR (3e 00)
+        self.assertIn(b"\x3e\x00", spawn_bytes)
+        # Opcode 0x01B1 = SET_CHAR_PROOFS (b1 01)
+        self.assertIn(b"\xb1\x01", spawn_bytes)
+        # Opcode 0x014B = SET_CHAR_HEALTH (4b 01)
+        self.assertIn(b"\x4b\x01", spawn_bytes)
+        # Opcode 0x0023 = TERMINATE_THIS_SCRIPT (23 00) at end
+        self.assertEqual(spawn_bytes[-2:], b"\x23\x00")
+
+    def test_scm_move_bytecode_generation(self):
+        # Handle 0x0101, coords (482.0, -1380.0, 10.5), heading 1.57 rad
+        move_hex = make_move_char_scm(0x0101, 482.0, -1380.0, 10.5, 1.57)
+        move_bytes = bytes.fromhex(move_hex)
+        
+        self.assertLessEqual(len(move_bytes), 176)
+        # Opcode 0x0044 = SET_CHAR_COORDINATES (44 00)
+        self.assertEqual(move_bytes[0:2], b"\x44\x00")
+        # Opcode 0x00CF = SET_CHAR_HEADING (cf 00)
+        self.assertIn(b"\xcf\x00", move_bytes)
+        # Opcode 0x0023 = TERMINATE_THIS_SCRIPT (23 00)
+        self.assertEqual(move_bytes[-2:], b"\x23\x00")
+
+    def test_character_model_mapping(self):
+        # Female resident
+        self.assertEqual(get_character_model_id(1, 0), 14)
+        # Male outfits
+        self.assertEqual(get_character_model_id(0, 1), 2)  # Smart
+        self.assertEqual(get_character_model_id(0, 2), 5)  # Street
+        self.assertEqual(get_character_model_id(0, 3), 3)  # Muscle
+        self.assertEqual(get_character_model_id(0, 4), 4)  # Tracksuit
+        self.assertEqual(get_character_model_id(0, 5), 1)  # Casual
 
 
 if __name__ == "__main__":
