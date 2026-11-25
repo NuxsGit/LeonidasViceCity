@@ -167,9 +167,23 @@ namespace platform
         {
             if (g_gamepad)
                 return;
+            // In multiplayer, bind separate gamepads per session (Session 1 -> Gamepad 0, Session 2 -> Gamepad 1)
+            const char *sessEnv = std::getenv("LVCS_MP_SESSION");
+            int targetIndex = 0;
+            if (sessEnv && std::atoi(sessEnv) >= 2)
+                targetIndex = std::atoi(sessEnv) - 1;
+
+            int count = 0;
+            if (SDL_JoystickID *ids = SDL_GetGamepads(&count))
+            {
+                if (count > targetIndex)
+                    id = ids[targetIndex];
+                SDL_free(ids);
+            }
+
             g_gamepad = SDL_OpenGamepad(id);
             if (g_gamepad)
-                std::fprintf(stderr, "[platform] gamepad: %s\n", SDL_GetGamepadName(g_gamepad));
+                std::fprintf(stderr, "[platform] gamepad (session target %d): %s\n", targetIndex, SDL_GetGamepadName(g_gamepad));
         }
 
         void snapshotGamepad()
@@ -651,9 +665,15 @@ namespace platform
         int count = 0;
         const bool *state = SDL_GetKeyboardState(&count);
         std::array<bool, KEY_COUNT> now{};
-        for (const ScanKey &k : scanKeys())
-            if (k.scancode < count && state[k.scancode])
-                now[k.key] = true;
+        const bool isMultiplayer = std::getenv("LVCS_MP_SESSION") != nullptr;
+        // In multiplayer, ignore keyboard when unfocused so both sessions don't mirror keypresses
+        const bool acceptKeys = !isMultiplayer || windowFocused();
+        if (acceptKeys)
+        {
+            for (const ScanKey &k : scanKeys())
+                if (k.scancode < count && state[k.scancode])
+                    now[k.key] = true;
+        }
         for (int k = 0; k < KEY_COUNT; ++k)
         {
             if (k >= KEY_MOUSE_LEFT && k <= KEY_WHEEL_DOWN)

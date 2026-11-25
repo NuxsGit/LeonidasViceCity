@@ -382,20 +382,7 @@ namespace vcs::multiplayer
             }
         }
 
-        // 5. Automatic Initial Rendezvous & Manual Warp Hotkey
-        // For Client (Session 2), auto-warp next to Host when first received
-        static bool s_clientSpawnSynced = false;
-        if (!g_isHost && !s_clientSpawnSynced && g_remotePlayer.sessionId != 0 &&
-            (std::abs(g_remotePlayer.x) > 1.0f || std::abs(g_remotePlayer.y) > 1.0f))
-        {
-            s_clientSpawnSynced = true;
-            wrf(rdram, ped + 0x30, g_remotePlayer.x + 2.0f);
-            wrf(rdram, ped + 0x34, g_remotePlayer.y);
-            wrf(rdram, ped + 0x38, g_remotePlayer.z);
-            wrf(rdram, ped + 0x420, g_remotePlayer.heading);
-        }
-
-        // Manual Rendezvous Hotkey [F9] or [M]
+        // 5. Manual Rendezvous Hotkey [F9] or [M] (Optional player action to meet up)
         if (platform::keyPressed(platform::KEY_F9) || platform::keyPressed('M'))
         {
             if (g_remotePlayer.sessionId != 0 && (std::abs(g_remotePlayer.x) > 1.0f || std::abs(g_remotePlayer.y) > 1.0f))
