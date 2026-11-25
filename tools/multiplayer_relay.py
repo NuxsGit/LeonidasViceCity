@@ -69,6 +69,7 @@ class MultiplayerMemoryBridge(threading.Thread):
         self.s2_ped = 0
         self.s1_remote_ped = 0
         self.s2_remote_ped = 0
+        self.s2_spawn_synced = False
 
     def run(self):
         print("[LVCS-MP Bridge] Memory bridge active: monitoring Session 1 (47615) & Session 2 (47616)...")
@@ -128,6 +129,20 @@ class MultiplayerMemoryBridge(threading.Thread):
         p2_ped = int(p2_parts[1], 16)
         x2, y2, z2 = float(p2_parts[2]), float(p2_parts[3]), float(p2_parts[4])
 
+        # Safety Rescue: if Player 1 is out in the ocean (-1004, -1435) from older buggy saves,
+        # recover to solid ground at Ocean Beach outside the Pole Position Club
+        if x1 < -800.0 and y1 < -1200.0:
+            x1, y1, z1 = 482.0, -1380.0, 10.5
+            send_cmd(f"pokef 0x{p1_ped + 0x30:08x} {x1:.3f} {y1:.3f} {z1:.3f}", port=47615)
+
+        # Automatic initial rendezvous: spawn Player 2 right next to Player 1
+        if not self.s2_spawn_synced and (abs(x1) > 1.0 or abs(y1) > 1.0) and (abs(x2) > 1.0 or abs(y2) > 1.0):
+            dist = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
+            if dist > 10.0:
+                x2, y2, z2 = x1 + 2.5, y1, z1
+                send_cmd(f"pokef 0x{p2_ped + 0x30:08x} {x2:.3f} {y2:.3f} {z2:.3f}", port=47616)
+            self.s2_spawn_synced = True
+
         prof1, prof2 = self.load_profiles()
         m1 = get_character_model_id(prof1.get("gender", 0), prof1.get("outfit", 0))
         m2 = get_character_model_id(prof2.get("gender", 0), prof2.get("outfit", 1))
@@ -146,9 +161,11 @@ class MultiplayerMemoryBridge(threading.Thread):
             pool_res = send_cmd("peek 0x00487A94 12", port=47615)
             if pool_res.startswith("ok"):
                 raw_hex = pool_res[3:].strip()
-                if len(raw_hex) >= 8:
+                if len(raw_hex) >= 16:
                     entries_addr = int("".join(reversed([raw_hex[i:i+2] for i in range(0, 8, 2)])), 16)
-                    self.s1_remote_ped = entries_addr + 1 * 0x8D0
+                    flags_addr = int("".join(reversed([raw_hex[i:i+2] for i in range(8, 16, 2)])), 16)
+                    self.s1_remote_ped = entries_addr + 1 * 0xD20
+                    send_cmd(f"poke 0x{flags_addr + 1:08x} 01", port=47615) # mark ped slot 1 active
 
         if self.s1_remote_ped:
             # Set coordinates to Session 2's live position
@@ -163,9 +180,11 @@ class MultiplayerMemoryBridge(threading.Thread):
             pool_res = send_cmd("peek 0x00487A94 12", port=47616)
             if pool_res.startswith("ok"):
                 raw_hex = pool_res[3:].strip()
-                if len(raw_hex) >= 8:
+                if len(raw_hex) >= 16:
                     entries_addr = int("".join(reversed([raw_hex[i:i+2] for i in range(0, 8, 2)])), 16)
-                    self.s2_remote_ped = entries_addr + 1 * 0x8D0
+                    flags_addr = int("".join(reversed([raw_hex[i:i+2] for i in range(8, 16, 2)])), 16)
+                    self.s2_remote_ped = entries_addr + 1 * 0xD20
+                    send_cmd(f"poke 0x{flags_addr + 1:08x} 01", port=47616) # mark ped slot 1 active
 
         if self.s2_remote_ped:
             # Set coordinates to Session 1's live position

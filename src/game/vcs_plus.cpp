@@ -69,15 +69,15 @@ namespace vcs::plus
         constexpr float kClubExtY = -1380.0f;
         constexpr float kClubExtZ = 10.0f;
 
-        // Interior Main Lounge (Bar, Stage with Pole, Synthwave Disco Floor)
-        constexpr float kClubIntX = -1004.0f;
-        constexpr float kClubIntY = -1435.0f;
-        constexpr float kClubIntZ = 12.0f;
+        // Interior Main Lounge (Bar, Stage with Pole, Synthwave Disco Floor on Ocean Beach)
+        constexpr float kClubIntX = 486.0f;
+        constexpr float kClubIntY = -1384.0f;
+        constexpr float kClubIntZ = 10.5f;
 
         // Private VIP Booth (Vanilla Unicorn style Private Dance Room)
-        constexpr float kVipBoothX = -1008.0f;
-        constexpr float kVipBoothY = -1440.0f;
-        constexpr float kVipBoothZ = 12.0f;
+        constexpr float kVipBoothX = 489.0f;
+        constexpr float kVipBoothY = -1388.0f;
+        constexpr float kVipBoothZ = 10.5f;
 
         // VCS+ State
         bool g_gta6Pop = true;
@@ -178,8 +178,7 @@ namespace vcs::plus
         const uint32_t ped = rd32(rdram, kPlayerPed);
         if (ped)
         {
-            // Switch area to Club Interior (Area 1)
-            wr32(rdram, kCurrArea, 1);
+            wr32(rdram, kCurrArea, 0); // Keep world area 0 for seamless Ocean Beach rendering
             wrf(rdram, ped + 0x30, kClubIntX);
             wrf(rdram, ped + 0x34, kClubIntY);
             wrf(rdram, ped + 0x38, kClubIntZ);
@@ -193,7 +192,6 @@ namespace vcs::plus
         const uint32_t ped = rd32(rdram, kPlayerPed);
         if (ped)
         {
-            // Switch area back to Outdoors (Area 0)
             wr32(rdram, kCurrArea, 0);
             wrf(rdram, ped + 0x30, kClubExtX + 2.0f);
             wrf(rdram, ped + 0x34, kClubExtY);
@@ -211,7 +209,7 @@ namespace vcs::plus
         const uint32_t ped = rd32(rdram, kPlayerPed);
         if (ped)
         {
-            wr32(rdram, kCurrArea, 1);
+            wr32(rdram, kCurrArea, 0);
             wrf(rdram, ped + 0x30, kVipBoothX);
             wrf(rdram, ped + 0x34, kVipBoothY);
             wrf(rdram, ped + 0x38, kVipBoothZ);
