@@ -135,14 +135,6 @@ class MultiplayerMemoryBridge(threading.Thread):
             x1, y1, z1 = 482.0, -1380.0, 10.5
             send_cmd(f"pokef 0x{p1_ped + 0x30:08x} {x1:.3f} {y1:.3f} {z1:.3f}", port=47615)
 
-        # Automatic initial rendezvous: spawn Player 2 right next to Player 1
-        if not self.s2_spawn_synced and (abs(x1) > 1.0 or abs(y1) > 1.0) and (abs(x2) > 1.0 or abs(y2) > 1.0):
-            dist = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
-            if dist > 10.0:
-                x2, y2, z2 = x1 + 2.5, y1, z1
-                send_cmd(f"pokef 0x{p2_ped + 0x30:08x} {x2:.3f} {y2:.3f} {z2:.3f}", port=47616)
-            self.s2_spawn_synced = True
-
         prof1, prof2 = self.load_profiles()
         m1 = get_character_model_id(prof1.get("gender", 0), prof1.get("outfit", 0))
         m2 = get_character_model_id(prof2.get("gender", 0), prof2.get("outfit", 1))
