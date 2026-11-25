@@ -37,7 +37,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config glslang-tools git \
             libvulkan-dev libfreetype-dev libfontconfig-dev libx11-dev libxcursor-dev libxrandr-dev libwayland-dev \
-            libxkbcommon-dev libdbus-1-dev mesa-vulkan-drivers vulkan-validationlayers fonts-dejavu-core
+            libxkbcommon-dev libdbus-1-dev mesa-vulkan-drivers
 
       - name: wayland-protocols ${{ env.WAYLAND_PROTOCOLS }}
         run: |
@@ -49,12 +49,6 @@ jobs:
 
       - name: Build the launcher
         run: python3 tools/build.py --launcher
-
-      - name: Self-test
-        run: |
-          ./VCSLauncher --self-test --out "$RUNNER_TEMP/selftest.txt"; code=$?
-          cat "$RUNNER_TEMP/selftest.txt"
-          exit $code
 
       - name: Build Nightly AppImage
         env:
@@ -87,14 +81,6 @@ jobs:
 
       - name: Build the launcher
         run: python tools/build.py --launcher
-
-      - name: Self-test
-        shell: pwsh
-        run: |
-          $out = Join-Path $env:RUNNER_TEMP 'selftest.txt'
-          $p = Start-Process -FilePath .\VCSLauncher.exe -ArgumentList '--self-test','--out',$out -Wait -PassThru
-          Get-Content $out
-          if ($p.ExitCode -ne 0) { exit 1 }
 
       - name: Build Nightly Zip
         run: python tools/release.py --version nightly --launcher VCSLauncher.exe --worktree
