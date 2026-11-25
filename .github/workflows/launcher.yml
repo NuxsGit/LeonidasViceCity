@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       platforms:
-        description: "Platforms to build: all, or any of linux windows macos"
+        description: "Platforms to build: all, or any of linux windows"
         default: all
 
 concurrency:
@@ -152,63 +152,3 @@ jobs:
             build/dist/*.zip
             build/dist/*.zip.sha256
 
-  # macOS on Apple Silicon (docs/MACOS.md): VCSLauncher.app with Apple's clang, Metal and Core Text; its shader through
-  # glslang + SPIRV-Cross built from pinned sources (tools/shader_tools.py, cached). A virtual Mac may have no Metal
-  # device: the self-test then reports the renderer as skipped (VCS_SELFTEST_NO_GPU) instead of failing.
-  macos:
-    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, 'macos')
-    runs-on: macos-15
-    env:
-      VCS_SELFTEST_NO_GPU: "1"
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/cache@v4
-        with:
-          path: build/build-tools
-          key: build-tools-macos-${{ hashFiles('tools/toolchain.py', 'tools/shader_tools/CMakeLists.txt') }}
-
-      - name: Build the launcher
-        run: python3 tools/build.py --launcher
-
-      - name: Self-test
-        run: |
-          ./VCSLauncher.app/Contents/MacOS/VCSLauncher --self-test --out "$RUNNER_TEMP/selftest.txt"; code=$?
-          cat "$RUNNER_TEMP/selftest.txt"
-          exit $code
-
-      - name: Tool checks
-        run: |
-          python3 tools/doctor.py || true
-          python3 tools/deps.py list --platform macos
-          /usr/bin/python3 -I tools/doctor.py --json > /dev/null
-
-      - name: Screenshots
-        continue-on-error: true # no Metal device on some virtual Macs
-        run: |
-          mkdir -p "$RUNNER_TEMP/shots"
-          for screen in home gallery setup:disc setup:tools sheet:settings; do
-            ./VCSLauncher.app/Contents/MacOS/VCSLauncher --screenshot "$RUNNER_TEMP/shots/${screen/:/-}.png" --screen "$screen"
-          done
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launcher-macos-screenshots
-          path: ${{ runner.temp }}/shots
-          if-no-files-found: ignore
-
-      # the disk image (the app next to an Applications link), self-tested as a player starts it. A manual run makes it
-      # too, as an artifact: only a tag publishes
-      - name: Release app
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        run: python3 tools/release.py --platform macos --ref ${{ github.ref_name }} --launcher VCSLauncher.app
-
-      - uses: actions/upload-artifact@v4
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        with:
-          name: release-macos
-          path: |
-            build/dist/*.dmg
-            build/dist/*.dmg.sha256

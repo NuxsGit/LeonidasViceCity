@@ -120,42 +120,8 @@ jobs:
             build/dist/*.zip
             build/dist/*.zip.sha256
 
-  macos:
-    needs: [prep]
-    runs-on: macos-15
-    env:
-      VCS_SELFTEST_NO_GPU: "1"
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/cache@v4
-        with:
-          path: build/build-tools
-          key: build-tools-macos-${{ hashFiles('tools/toolchain.py', 'tools/shader_tools/CMakeLists.txt') }}
-
-      - name: Build the launcher
-        run: python3 tools/build.py --launcher
-
-      - name: Self-test
-        run: |
-          ./VCSLauncher.app/Contents/MacOS/VCSLauncher --self-test --out "$RUNNER_TEMP/selftest.txt"; code=$?
-          cat "$RUNNER_TEMP/selftest.txt"
-          exit $code
-
-      - name: Release app
-        run: python3 tools/release.py --platform macos --version ${{ needs.prep.outputs.version }} --launcher VCSLauncher.app --worktree
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-macos
-          path: |
-            build/dist/*.dmg
-            build/dist/*.dmg.sha256
-
   publish:
-    needs: [prep, linux, windows, macos]
+    needs: [prep, linux, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
